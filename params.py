@@ -10,6 +10,7 @@ def get_params():
     args.add_argument("-seed", "--seed", default=None, type=int)
     args.add_argument("-few", "--few", default=1, type=int)
     args.add_argument("-nq", "--num_query", default=3, type=int)
+    args.add_argument("-bc", "--num_base_classes", default=30, type=int)
     args.add_argument("-metric", "--metric", default="MRR", choices=["MRR", "Hits@10", "Hits@5", "Hits@1"])
 
     args.add_argument("-dim", "--embed_dim", default=100, type=int)

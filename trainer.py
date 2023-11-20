@@ -27,7 +27,6 @@ class Trainer:
         self.checkpoint_epoch = parameter['checkpoint_epoch']
         # device
         self.device = parameter['device']
-
         self.metaR = MetaR(dataset, parameter)
         self.metaR.to(self.device)
         # optimizer

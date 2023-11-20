@@ -5,7 +5,6 @@ import json
 
 if __name__ == '__main__':
     params = get_params()
-
     print("---------Parameters---------")
     for k, v in params.items():
         print(k + ': ' + str(v))
@@ -22,23 +21,23 @@ if __name__ == '__main__':
 
     # select the dataset
     for k, v in data_dir.items():
-        data_dir[k] = params['data_path']+v
+        data_dir[k] = params['data_path'] + v
 
     tail = ''
-    if params['data_form'] == 'In-Train':   # diff?
+    if params['data_form'] == 'In-Train':  # diff?
         tail = '_in_train'
 
     dataset = dict()
     print("loading train_tasks{} ... ...".format(tail))
-    dataset['train_tasks'] = json.load(open(data_dir['train_tasks'+tail]))
+    dataset['train_tasks'] = json.load(open(data_dir['train_tasks' + tail]))
     print("loading test_tasks ... ...")
     dataset['test_tasks'] = json.load(open(data_dir['test_tasks']))
     print("loading dev_tasks ... ...")
     dataset['dev_tasks'] = json.load(open(data_dir['dev_tasks']))
     print("loading rel2candidates{} ... ...".format(tail))
-    dataset['rel2candidates'] = json.load(open(data_dir['rel2candidates'+tail]))
+    dataset['rel2candidates'] = json.load(open(data_dir['rel2candidates' + tail]))
     print("loading e1rel_e2{} ... ...".format(tail))
-    dataset['e1rel_e2'] = json.load(open(data_dir['e1rel_e2'+tail]))
+    dataset['e1rel_e2'] = json.load(open(data_dir['e1rel_e2' + tail]))
     print("loading ent2id ... ...")
     dataset['ent2id'] = json.load(open(data_dir['ent2ids']))
 
@@ -75,4 +74,3 @@ if __name__ == '__main__':
             trainer.eval_by_relation(istest=False)
         else:
             trainer.eval(istest=False)
-
