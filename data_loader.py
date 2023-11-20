@@ -5,7 +5,7 @@ import numpy as np
 class DataLoader(object):
     def __init__(self, dataset, parameter, step='train'):
         self.curr_rel_idx = 0
-        self.tasks = dataset[step+'_tasks']
+        self.tasks = dataset[step + '_tasks']
         self.rel2candidates = dataset['rel2candidates']
         self.e1rel_e2 = dataset['e1rel_e2']
         self.all_rels = sorted(list(self.tasks.keys()))
@@ -39,7 +39,7 @@ class DataLoader(object):
         # get current tasks by curr_rel from all tasks and shuffle it
         curr_tasks = self.tasks[curr_rel]
         curr_tasks_idx = np.arange(0, len(curr_tasks), 1)
-        curr_tasks_idx = np.random.choice(curr_tasks_idx, self.few+self.nq)
+        curr_tasks_idx = np.random.choice(curr_tasks_idx, self.few + self.nq)
         support_triples = [curr_tasks[i] for i in curr_tasks_idx[:self.few]]
         query_triples = [curr_tasks[i] for i in curr_tasks_idx[self.few:]]
 
@@ -64,7 +64,7 @@ class DataLoader(object):
                     break
             negative_triples.append([e1, rel, negative])
 
-        return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel
+        return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel  # TODO: relation not just one
 
     def next_batch(self):
         next_batch_all = [self.next_one() for _ in range(self.bs)]
@@ -158,4 +158,3 @@ class DataLoader(object):
         negative_triples = [negative_triples]
 
         return [support_triples, support_negative_triples, query_triple, negative_triples], curr_rel
-

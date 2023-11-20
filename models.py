@@ -10,14 +10,14 @@ class RelationMetaLearner(nn.Module):
         self.few = few
         self.out_size = out_size
         self.rel_fc1 = nn.Sequential(OrderedDict([
-            ('fc',   nn.Linear(2*embed_size, num_hidden1)),
-            ('bn',   nn.BatchNorm1d(few)),
+            ('fc', nn.Linear(2 * embed_size, num_hidden1)),
+            ('bn', nn.BatchNorm1d(few)),
             ('relu', nn.LeakyReLU()),
             ('drop', nn.Dropout(p=dropout_p)),
         ]))
         self.rel_fc2 = nn.Sequential(OrderedDict([
-            ('fc',   nn.Linear(num_hidden1, num_hidden2)),
-            ('bn',   nn.BatchNorm1d(few)),
+            ('fc', nn.Linear(num_hidden1, num_hidden2)),
+            ('bn', nn.BatchNorm1d(few)),
             ('relu', nn.LeakyReLU()),
             ('drop', nn.Dropout(p=dropout_p)),
         ]))
@@ -83,16 +83,16 @@ class MetaR(nn.Module):
         # transfer task string into embedding
         support, support_negative, query, negative = [self.embedding(t) for t in task]
 
-        few = support.shape[1]              # num of few
+        few = support.shape[1]  # num of few
         num_sn = support_negative.shape[1]  # num of support negative
-        num_q = query.shape[1]              # num of query
-        num_n = negative.shape[1]           # num of query negative
+        num_q = query.shape[1]  # num of query
+        num_n = negative.shape[1]  # num of query negative
 
-        rel = self.relation_learner(support)
+        rel = self.relation_learner(support)  # FC
         rel.retain_grad()
 
         # relation for support
-        rel_s = rel.expand(-1, few+num_sn, -1, -1)
+        rel_s = rel.expand(-1, few + num_sn, -1, -1)
 
         # because in test and dev step, same relation uses same support,
         # so it's no need to repeat the step of relation-meta learning
@@ -105,13 +105,14 @@ class MetaR(nn.Module):
 
                 p_score, n_score = self.embedding_learner(sup_neg_e1, sup_neg_e2, rel_s, few)
 
-                y = torch.Tensor([1]).to(self.device)
+                y = torch.ones(p_score.shape[0], 1)  # TODO: may update y shape
+                # y = torch.Tensor([1]).to(self.device)
                 self.zero_grad()
                 loss = self.loss_func(p_score, n_score, y)
                 loss.backward(retain_graph=True)
 
                 grad_meta = rel.grad
-                rel_q = rel - self.beta*grad_meta
+                rel_q = rel - self.beta * grad_meta
             else:
                 rel_q = rel
 
@@ -123,4 +124,3 @@ class MetaR(nn.Module):
         p_score, n_score = self.embedding_learner(que_neg_e1, que_neg_e2, rel_q, num_q)
 
         return p_score, n_score
-

@@ -25,7 +25,7 @@ if __name__ == '__main__':
         data_dir[k] = params['data_path']+v
 
     tail = ''
-    if params['data_form'] == 'In-Train':
+    if params['data_form'] == 'In-Train':   # diff?
         tail = '_in_train'
 
     dataset = dict()
