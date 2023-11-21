@@ -21,7 +21,7 @@ class DataLoader(object):
             self.num_tris = len(self.eval_triples)
             self.curr_tri_idx = 0
 
-    def next_one(self):
+    def next_one(self, is_last):
         # shift curr_rel_idx to 0 after one circle of all relations
         if self.curr_rel_idx % self.num_rels == 0:
             random.shuffle(self.all_rels)
@@ -29,7 +29,6 @@ class DataLoader(object):
 
         # get current relation and current candidates
         curr_rel = self.all_rels[self.curr_rel_idx]
-        self.curr_rel_idx = (self.curr_rel_idx + 1) % self.num_rels  # shift current relation idx to next
         curr_cand = self.rel2candidates[curr_rel]
         while len(curr_cand) <= 10 or len(self.tasks[curr_rel]) <= 10:  # ignore the small task sets
             curr_rel = self.all_rels[self.curr_rel_idx]
@@ -63,6 +62,9 @@ class DataLoader(object):
                         and negative != e2:
                     break
             negative_triples.append([e1, rel, negative])
+
+        # shift current relation idx to next
+        self.curr_rel_idx = (self.curr_rel_idx + 1) % self.num_rels if is_last else self.curr_rel_idx
 
         return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel  # TODO: relation not just one
 
