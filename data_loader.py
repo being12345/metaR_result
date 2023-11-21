@@ -23,9 +23,9 @@ class DataLoader(object):
 
     def next_one(self, is_last):
         # shift curr_rel_idx to 0 after one circle of all relations
-        if self.curr_rel_idx % self.num_rels == 0:
-            random.shuffle(self.all_rels)
-            self.curr_rel_idx = 0
+        # if self.curr_rel_idx % self.num_rels == 0:    # TODO: It's no need in continual learning
+        #     random.shuffle(self.all_rels)
+        #     self.curr_rel_idx = 0
 
         # get current relation and current candidates
         curr_rel = self.all_rels[self.curr_rel_idx]
@@ -68,8 +68,8 @@ class DataLoader(object):
 
         return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel  # TODO: relation not just one
 
-    def next_batch(self):
-        next_batch_all = [self.next_one() for _ in range(self.bs)]
+    def next_batch(self, is_last):
+        next_batch_all = [self.next_one(is_last) for _ in range(self.bs)]
 
         support, support_negative, query, negative, curr_rel = zip(*next_batch_all)
         return [support, support_negative, query, negative], curr_rel

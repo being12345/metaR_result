@@ -137,45 +137,50 @@ class Trainer:
         best_epoch = 0
         best_value = 0
         bad_counts = 0
+        num_tasks = 5   # TODO: update it in parser
+        is_last = False
 
-        # training by epoch
-        for e in range(self.epoch):
-            # sample one batch from data_loader
-            train_task, curr_rel = self.train_data_loader.next_batch()
-            loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
-            # print the loss on specific epoch
-            if e % self.print_epoch == 0:
-                loss_num = loss.item()
-                self.write_training_log({'Loss': loss_num}, e)
-                print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
-            # save checkpoint on specific epoch
-            if e % self.checkpoint_epoch == 0 and e != 0:
-                print('Epoch  {} has finished, saving...'.format(e))
-                self.save_checkpoint(e)
-            # do evaluation on specific epoch
-            if e % self.eval_epoch == 0 and e != 0:
-                print('Epoch  {} has finished, validating...'.format(e))
+        for task in range(num_tasks):
+            # training by epoch
+            for e in range(self.epoch):
+                is_last = True if e == self.epoch - 1 else False
+                # sample one batch from data_loader
+                train_task, curr_rel = self.train_data_loader.next_batch(is_last)
+                loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
+                # print the loss on specific epoch
+                if e % self.print_epoch == 0:
+                    loss_num = loss.item()
+                    self.write_training_log({'Loss': loss_num}, e)
+                    print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
+                # save checkpoint on specific epoch
+                if e % self.checkpoint_epoch == 0 and e != 0:
+                    print('Epoch  {} has finished, saving...'.format(e))
+                    self.save_checkpoint(e)
+                # do evaluation on specific epoch
+                if e % self.eval_epoch == 0 and e != 0:
+                    print('Epoch  {} has finished, validating...'.format(e))
 
-                valid_data = self.eval(istest=False, epoch=e)
-                self.write_validating_log(valid_data, e)
+                    valid_data = self.eval(istest=False, epoch=e)
+                    self.write_validating_log(valid_data, e)
 
-                metric = self.parameter['metric']
-                # early stopping checking
-                if valid_data[metric] > best_value:
-                    best_value = valid_data[metric]
-                    best_epoch = e
-                    print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
-                    bad_counts = 0
-                    # save current best
-                    self.save_checkpoint(best_epoch)
-                else:
-                    print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
-                        metric, best_value, best_epoch, bad_counts))
-                    bad_counts += 1
+                    metric = self.parameter['metric']
+                    # early stopping checking
+                    if valid_data[metric] > best_value:
+                        best_value = valid_data[metric]
+                        best_epoch = e
+                        print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
+                        bad_counts = 0
+                        # save current best
+                        self.save_checkpoint(best_epoch)
+                    else:
+                        print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
+                            metric, best_value, best_epoch, bad_counts))
+                        bad_counts += 1
 
-                if bad_counts >= self.early_stopping_patience:
-                    print('\tEarly stopping at epoch %d' % e)
-                    break
+                    if bad_counts >= self.early_stopping_patience:
+                        print('\tEarly stopping at epoch %d' % e)
+                        break
+            is_last = True
 
         print('Training has finished')
         print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
