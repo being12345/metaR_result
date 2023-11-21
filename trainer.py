@@ -137,8 +137,7 @@ class Trainer:
         best_epoch = 0
         best_value = 0
         bad_counts = 0
-        num_tasks = 5   # TODO: update it in parser
-        is_last = False
+        num_tasks = 7   # TODO: update it in parser
 
         for task in range(num_tasks):
             # training by epoch
