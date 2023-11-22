@@ -70,8 +70,6 @@ class DataLoader(object):
                     break
             negative_triples.append([e1, rel, negative])
 
-        print(f'current relation index {self.curr_rel_idx}')    # TODO: test relation loop 0-30
-
         # shift current relation idx to next
         self.curr_rel_idx = (self.curr_rel_idx + 1) % self.num_rels
 

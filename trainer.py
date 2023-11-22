@@ -147,7 +147,6 @@ class Trainer:
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
                 # Test train_task num
-                print(f'current task: {task} epoch: {e} relation: {len(train_task[0])}, num: {len(train_task[0][0])}') # TODO: tesk current task
                 loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
                 # # print the loss on specific epoch
                 # if e % self.print_epoch == 0:
@@ -158,32 +157,31 @@ class Trainer:
                 # if e % self.checkpoint_epoch == 0 and e != 0:
                 #     print('Epoch  {} has finished, saving...'.format(e))
                 #     self.save_checkpoint(e)
-                # # do evaluation on specific epoch
-                # if e % self.eval_epoch == 0 and e != 0:
-                #     print('Epoch  {} has finished, validating...'.format(e))
-                #
-                #     valid_data = self.eval(istest=False, epoch=e)
-                #     self.write_validating_log(valid_data, e)
-                #
-                #     metric = self.parameter['metric']
-                #     # early stopping checking
-                #     if valid_data[metric] > best_value:
-                #         best_value = valid_data[metric]
-                #         best_epoch = e
-                #         print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
-                #         bad_counts = 0
-                #         # save current best
-                #         self.save_checkpoint(best_epoch)
-                #     else:
-                #         print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
-                #             metric, best_value, best_epoch, bad_counts))
-                #         bad_counts += 1
-                #
-                #     if bad_counts >= self.early_stopping_patience:
-                #         print('\tEarly stopping at epoch %d' % e)
-                #         break
+                # do evaluation on specific epoch
+                if e % self.eval_epoch == 0 and e != 0:
+                    print('Epoch  {} has finished, validating...'.format(e))
 
-            print(f'task {task} current relation index {self.train_data_loader.curr_rel_idx}')  # test expected <= 51 no cycle
+                    valid_data = self.eval(istest=False, epoch=e)
+                    self.write_validating_log(valid_data, e)
+
+                    metric = self.parameter['metric']
+                    # early stopping checking
+                    if valid_data[metric] > best_value:
+                        best_value = valid_data[metric]
+                        best_epoch = e
+                        print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
+                        bad_counts = 0
+                        # save current best
+                        self.save_checkpoint(best_epoch)
+                    else:
+                        print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
+                            metric, best_value, best_epoch, bad_counts))
+                        bad_counts += 1
+
+                    if bad_counts >= self.early_stopping_patience:
+                        print('\tEarly stopping at epoch %d' % e)
+                        break
+
         print('Training has finished')
         print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
         self.save_best_state_dict(best_epoch)
