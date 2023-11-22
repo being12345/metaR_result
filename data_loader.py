@@ -10,9 +10,14 @@ class DataLoader(object):
         self.e1rel_e2 = dataset['e1rel_e2']
         self.all_rels = sorted(list(self.tasks.keys()))
         self.num_rels = len(self.all_rels)
+        # base class settings
+        self.bfew = parameter['base_classes_few']
+        self.bnq = parameter['base_classes_num_query']
+        self.br = parameter['base_classes_relation']
+        # novel class settings
         self.few = parameter['few']
-        self.bs = parameter['batch_size']
         self.nq = parameter['num_query']
+        self.bs = parameter['batch_size']
 
         if step != 'train':
             self.eval_triples = []
@@ -21,11 +26,13 @@ class DataLoader(object):
             self.num_tris = len(self.eval_triples)
             self.curr_tri_idx = 0
 
-    def next_one(self, is_last):
+    def next_one(self, is_last, is_base):
         # shift curr_rel_idx to 0 after one circle of all relations
         # if self.curr_rel_idx % self.num_rels == 0:    # TODO: It's no need in continual learning
         #     random.shuffle(self.all_rels)
         #     self.curr_rel_idx = 0
+        few = self.bfew if is_base is True else self.few
+        nq = self.bnq if is_base is True else self.nq
 
         # get current relation and current candidates
         curr_rel = self.all_rels[self.curr_rel_idx]
@@ -38,9 +45,9 @@ class DataLoader(object):
         # get current tasks by curr_rel from all tasks and shuffle it
         curr_tasks = self.tasks[curr_rel]
         curr_tasks_idx = np.arange(0, len(curr_tasks), 1)
-        curr_tasks_idx = np.random.choice(curr_tasks_idx, self.few + self.nq)
-        support_triples = [curr_tasks[i] for i in curr_tasks_idx[:self.few]]
-        query_triples = [curr_tasks[i] for i in curr_tasks_idx[self.few:]]
+        curr_tasks_idx = np.random.choice(curr_tasks_idx, few + nq)
+        support_triples = [curr_tasks[i] for i in curr_tasks_idx[:few]]
+        query_triples = [curr_tasks[i] for i in curr_tasks_idx[few:]]
 
         # construct support and query negative triples
         support_negative_triples = []
@@ -63,13 +70,18 @@ class DataLoader(object):
                     break
             negative_triples.append([e1, rel, negative])
 
+        print(f'current relation index {self.curr_rel_idx}')    # TODO: test relation loop 0-30
+
         # shift current relation idx to next
-        self.curr_rel_idx = (self.curr_rel_idx + 1) % self.num_rels if is_last else self.curr_rel_idx
+        self.curr_rel_idx = (self.curr_rel_idx + 1) % self.num_rels
 
         return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel  # TODO: relation not just one
 
-    def next_batch(self, is_last):
-        next_batch_all = [self.next_one(is_last) for _ in range(self.bs)]
+    def next_batch(self, is_last, is_base):
+        relation = self.br if is_base is True else self.bs
+        last_rel_idx = self.curr_rel_idx
+        next_batch_all = [self.next_one(is_last, is_base) for _ in range(relation)]
+        self.curr_rel_idx = self.curr_rel_idx if is_last is True else last_rel_idx
 
         support, support_negative, query, negative, curr_rel = zip(*next_batch_all)
         return [support, support_negative, query, negative], curr_rel

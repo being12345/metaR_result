@@ -11,19 +11,19 @@ class RelationMetaLearner(nn.Module):
         self.out_size = out_size
         self.rel_fc1 = nn.Sequential(OrderedDict([
             ('fc', nn.Linear(2 * embed_size, num_hidden1)),
-            ('bn', nn.BatchNorm1d(few)),
+            # ('bn', nn.BatchNorm1d(few)),    # TODO: why batchnorm1d with few
             ('relu', nn.LeakyReLU()),
             ('drop', nn.Dropout(p=dropout_p)),
         ]))
         self.rel_fc2 = nn.Sequential(OrderedDict([
             ('fc', nn.Linear(num_hidden1, num_hidden2)),
-            ('bn', nn.BatchNorm1d(few)),
+            # ('bn', nn.BatchNorm1d(few)),
             ('relu', nn.LeakyReLU()),
             ('drop', nn.Dropout(p=dropout_p)),
         ]))
         self.rel_fc3 = nn.Sequential(OrderedDict([
             ('fc', nn.Linear(num_hidden2, out_size)),
-            ('bn', nn.BatchNorm1d(few)),
+            # ('bn', nn.BatchNorm1d(few)),
         ]))
         nn.init.xavier_normal_(self.rel_fc1.fc.weight)
         nn.init.xavier_normal_(self.rel_fc2.fc.weight)

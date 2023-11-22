@@ -90,7 +90,7 @@ class Trainer:
 
     def logging_training_data(self, data, epoch):
         logging.info("Epoch: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                      epoch, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+            epoch, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
     def logging_eval_data(self, data, state_path, istest=False):
         setname = 'dev set'
@@ -98,8 +98,8 @@ class Trainer:
             setname = 'test set'
         logging.info("Eval {} on {}".format(state_path, setname))
         logging.info("MRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                      data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
-            
+            data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+
     def rank_predict(self, data, x, ranks):
         # query_idx is the idx of positive score
         query_idx = x.shape[0] - 1
@@ -137,50 +137,53 @@ class Trainer:
         best_epoch = 0
         best_value = 0
         bad_counts = 0
-        num_tasks = 7   # TODO: update it in parser
+        num_tasks = 8  # TODO: update it in parser
 
         for task in range(num_tasks):
             # training by epoch
             for e in range(self.epoch):
-                is_last = True if e == self.epoch - 1 else False
+                is_last = False if e != self.epoch - 1 else True
+                is_base = True if task == 0 else False
                 # sample one batch from data_loader
-                train_task, curr_rel = self.train_data_loader.next_batch(is_last)
+                train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
+                # Test train_task num
+                print(f'current task: {task} epoch: {e} relation: {len(train_task[0])}, num: {len(train_task[0][0])}') # TODO: tesk current task
                 loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
-                # print the loss on specific epoch
-                if e % self.print_epoch == 0:
-                    loss_num = loss.item()
-                    self.write_training_log({'Loss': loss_num}, e)
-                    print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
-                # save checkpoint on specific epoch
-                if e % self.checkpoint_epoch == 0 and e != 0:
-                    print('Epoch  {} has finished, saving...'.format(e))
-                    self.save_checkpoint(e)
-                # do evaluation on specific epoch
-                if e % self.eval_epoch == 0 and e != 0:
-                    print('Epoch  {} has finished, validating...'.format(e))
+                # # print the loss on specific epoch
+                # if e % self.print_epoch == 0:
+                #     loss_num = loss.item()
+                #     self.write_training_log({'Loss': loss_num}, e)
+                #     print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
+                # # save checkpoint on specific epoch
+                # if e % self.checkpoint_epoch == 0 and e != 0:
+                #     print('Epoch  {} has finished, saving...'.format(e))
+                #     self.save_checkpoint(e)
+                # # do evaluation on specific epoch
+                # if e % self.eval_epoch == 0 and e != 0:
+                #     print('Epoch  {} has finished, validating...'.format(e))
+                #
+                #     valid_data = self.eval(istest=False, epoch=e)
+                #     self.write_validating_log(valid_data, e)
+                #
+                #     metric = self.parameter['metric']
+                #     # early stopping checking
+                #     if valid_data[metric] > best_value:
+                #         best_value = valid_data[metric]
+                #         best_epoch = e
+                #         print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
+                #         bad_counts = 0
+                #         # save current best
+                #         self.save_checkpoint(best_epoch)
+                #     else:
+                #         print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
+                #             metric, best_value, best_epoch, bad_counts))
+                #         bad_counts += 1
+                #
+                #     if bad_counts >= self.early_stopping_patience:
+                #         print('\tEarly stopping at epoch %d' % e)
+                #         break
 
-                    valid_data = self.eval(istest=False, epoch=e)
-                    self.write_validating_log(valid_data, e)
-
-                    metric = self.parameter['metric']
-                    # early stopping checking
-                    if valid_data[metric] > best_value:
-                        best_value = valid_data[metric]
-                        best_epoch = e
-                        print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
-                        bad_counts = 0
-                        # save current best
-                        self.save_checkpoint(best_epoch)
-                    else:
-                        print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
-                            metric, best_value, best_epoch, bad_counts))
-                        bad_counts += 1
-
-                    if bad_counts >= self.early_stopping_patience:
-                        print('\tEarly stopping at epoch %d' % e)
-                        break
-            is_last = True
-
+            print(f'task {task} current relation index {self.train_data_loader.curr_rel_idx}')  # test expected <= 51 no cycle
         print('Training has finished')
         print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
         self.save_best_state_dict(best_epoch)
@@ -234,7 +237,7 @@ class Trainer:
             self.logging_eval_data(data, self.state_dict_file, istest)
 
         print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-               t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+            t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
         return data
 
@@ -254,7 +257,7 @@ class Trainer:
 
         for rel in data_loader.all_rels:
             print("rel: {}, num_cands: {}, num_tasks:{}".format(
-                   rel, len(data_loader.rel2candidates[rel]), len(data_loader.tasks[rel][self.few:])))
+                rel, len(data_loader.rel2candidates[rel]), len(data_loader.tasks[rel][self.few:])))
             data = {'MRR': 0, 'Hits@1': 0, 'Hits@5': 0, 'Hits@10': 0}
             temp = dict()
             t = 0
@@ -277,7 +280,7 @@ class Trainer:
                 sys.stdout.flush()
 
             print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                   t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
+                t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
 
             for k in data.keys():
                 all_data[k] += data[k]
@@ -291,4 +294,3 @@ class Trainer:
             all_t, all_data['MRR'], all_data['Hits@10'], all_data['Hits@5'], all_data['Hits@1']))
 
         return all_data
-
