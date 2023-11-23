@@ -29,6 +29,9 @@ if __name__ == '__main__':
 
     dataset = dict()
     print("loading train_tasks{} ... ...".format(tail))
+
+    print(data_dir['train_tasks'])  # test
+
     dataset['train_tasks'] = json.load(open(data_dir['train_tasks' + tail]))
     print("loading test_tasks ... ...")
     dataset['test_tasks'] = json.load(open(data_dir['test_tasks']))

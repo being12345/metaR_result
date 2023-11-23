@@ -56,17 +56,17 @@ def get_params():
 
 
 data_dir = {
-    'train_tasks_in_train': './NELL/train_tasks_in_train.json',
-    'train_tasks': './NELL/continual_train_tasks.json',
-    'test_tasks': './NELL/test_tasks.json',
-    'dev_tasks': './NELL/continual_dev_tasks.json',
+    'train_tasks_in_train': '/train_tasks_in_train.json',
+    'train_tasks': '/continual_train_tasks.json',
+    'test_tasks': '/test_tasks.json',
+    'dev_tasks': '/continual_dev_tasks.json',
 
-    'rel2candidates_in_train': './NELL/rel2candidates_in_train.json',
-    'rel2candidates': './NELL/rel2candidates.json',
+    'rel2candidates_in_train': '/rel2candidates_in_train.json',
+    'rel2candidates': '/rel2candidates.json',
 
-    'e1rel_e2_in_train': './NELL/e1rel_e2_in_train.json',
-    'e1rel_e2': './NELL/e1rel_e2.json',
+    'e1rel_e2_in_train': '/e1rel_e2_in_train.json',
+    'e1rel_e2': '/e1rel_e2.json',
 
-    'ent2ids': './NELL/ent2ids',
-    'ent2vec': './NELL/ent2vec.npy',
+    'ent2ids': '/ent2ids',
+    'ent2vec': '/ent2vec.npy',
 }
