@@ -22,7 +22,7 @@ class DataLoader(object):
         if step != 'train':
             self.eval_triples = []
             for rel in self.all_rels:
-                self.eval_triples.extend(self.tasks[rel][self.few:])
+                self.eval_triples.extend(self.tasks[rel][self.few:])    # append list
             self.num_tris = len(self.eval_triples)
             self.curr_tri_idx = 0
 

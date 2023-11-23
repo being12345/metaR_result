@@ -192,10 +192,7 @@ class Trainer:
         # clear sharing rel_q
         self.metaR.rel_q_sharing = dict()
 
-        if istest:
-            data_loader = self.test_data_loader
-        else:
-            data_loader = self.dev_data_loader
+        data_loader = self.test_data_loader if istest is True else self.dev_data_loader
         data_loader.curr_tri_idx = 0
 
         # initial return data of validation
