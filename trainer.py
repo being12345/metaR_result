@@ -128,7 +128,8 @@ class Trainer:
             self.optimizer.step()
         elif curr_rel != '':
             p_score, n_score = self.metaR(task, iseval, curr_rel)
-            y = torch.Tensor([1]).to(self.device)
+            y = torch.ones(p_score.shape[0], 1).to(self.device)
+            # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
         return loss, p_score, n_score
 
@@ -161,7 +162,7 @@ class Trainer:
                 if e % self.eval_epoch == 0 and e != 0:
                     print('Epoch  {} has finished, validating...'.format(e))
 
-                    valid_data = self.eval(istest=False, epoch=e)
+                    valid_data = self.eval(curr_rel, istest=False, epoch=e)
                     self.write_validating_log(valid_data, e)
 
                     metric = self.parameter['metric']
@@ -187,12 +188,17 @@ class Trainer:
         self.save_best_state_dict(best_epoch)
         print('Finish')
 
-    def eval(self, istest=False, epoch=None):
+    def eval(self, curr_rel, istest=False, epoch=None):
         self.metaR.eval()
         # clear sharing rel_q
         self.metaR.rel_q_sharing = dict()
 
         data_loader = self.test_data_loader if istest is True else self.dev_data_loader
+        if epoch == self.eval_epoch:  # represent first eval epoch, add relation triples
+            for rel in curr_rel:
+                data_loader.eval_triples.extend(
+                    data_loader.tasks[rel][self.few:])  # TODO: why? rest of triple? get almost triples
+            data_loader.num_tris = len(data_loader.eval_triples)
         data_loader.curr_tri_idx = 0
 
         # initial return data of validation

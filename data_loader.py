@@ -21,10 +21,10 @@ class DataLoader(object):
 
         if step != 'train':
             self.eval_triples = []
-            for rel in self.all_rels:
-                self.eval_triples.extend(self.tasks[rel][self.few:])    # append list
-            self.num_tris = len(self.eval_triples)
-            self.curr_tri_idx = 0
+            # for rel in self.all_rels:
+            #     self.eval_triples.extend(self.tasks[rel][self.few:])    # TODO: why? rest of triple? get almost triples
+            # self.num_tris = len(self.eval_triples)
+            # self.curr_tri_idx = 0
 
     def next_one(self, is_last, is_base):
         # shift curr_rel_idx to 0 after one circle of all relations

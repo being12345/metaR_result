@@ -23,7 +23,8 @@ def get_params():
     # args.add_argument("-epo", "--epoch", default=100000, type=int)
     args.add_argument("-epo", "--epoch", default=3, type=int)
     args.add_argument("-prt_epo", "--print_epoch", default=100, type=int)
-    args.add_argument("-eval_epo", "--eval_epoch", default=1000, type=int)
+    args.add_argument("-eval_epo", "--eval_epoch", default=2, type=int)
+    # args.add_argument("-eval_epo", "--eval_epoch", default=1000, type=int)
     args.add_argument("-ckpt_epo", "--checkpoint_epoch", default=1000, type=int)
 
     args.add_argument("-b", "--beta", default=5, type=float)

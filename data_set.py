@@ -2,8 +2,7 @@ import argparse
 import json
 
 parser = argparse.ArgumentParser(description='generate continual learning dataset')
-parser.add_argument('--num_support', default=3, type=int)
-parser.add_argument('--num_query', default=9, type=int)
+parser.add_argument('--val_rate', default=0.3, type=int)
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -15,7 +14,7 @@ if __name__ == '__main__':
         dev_tasks[k] = []
         train_tasks[k] = []
         for i in range(len(v)):
-            if i < args.num_support + args.num_query:
+            if i < int(args.val_rate * len(v)):
                 dev_tasks[k].append(v.pop())
             else:
                 train_tasks[k].append(v.pop())
