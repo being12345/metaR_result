@@ -55,9 +55,10 @@ if __name__ == '__main__':
     # data_loader
     train_data_loader = DataLoader(dataset, params, step='train')
     dev_data_loader = DataLoader(dataset, params, step='dev')
-    few_shot_dev_data_loader = DataLoader(dataset, params, step='few_shot_dev')
     test_data_loader = DataLoader(dataset, params, step='test')
-    data_loaders = [train_data_loader, dev_data_loader, test_data_loader]
+    few_shot_dev_data_loader = DataLoader(dataset, params, step='few_shot_dev')
+
+    data_loaders = [train_data_loader, dev_data_loader, test_data_loader, few_shot_dev_data_loader]
 
     # trainer
     trainer = Trainer(data_loaders, dataset, params)

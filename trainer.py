@@ -21,6 +21,7 @@ class Trainer:
         self.train_data_loader = data_loaders[0]
         self.dev_data_loader = data_loaders[1]
         self.test_data_loader = data_loaders[2]
+        self.fw_dev_data_loader = data_loaders[3]
         # parameters
         self.few = parameter['few']
         self.num_query = parameter['num_query']
@@ -168,29 +169,32 @@ class Trainer:
                 #     print('Epoch  {} has finished, saving...'.format(e))
                 #     self.save_checkpoint(e)
                 # do evaluation on specific epoch
-                if e % self.eval_epoch == 0 and e != 0 and task != 0:
-                    print('Epoch  {} has finished, validating...'.format(e))
-                    valid_data = self.novel_continual_eval(previous_relation, istest=False,
-                                                           epoch=e)  # continual learning val
-                    self.write_validating_log(valid_data, e)
+                if e % self.eval_epoch == 0 and e != 0:
+                    print('Epoch  {} has finished, validating few shot...'.format(e))
+                    self.fw_eval(istest=False, epoch=e)  # few shot val
+                    if task != 0:
+                        print('Epoch  {} has finished, validating continual learning...'.format(e))
+                        valid_data = self.novel_continual_eval(previous_relation, istest=False,
+                                                               epoch=e)  # continual learning val
+                        self.write_validating_log(valid_data, e)
 
-                    metric = self.parameter['metric']
-                    # # early stopping checking
-                    # if valid_data[metric] > best_value:
-                    #     best_value = valid_data[metric]
-                    #     best_epoch = e
-                    #     print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
-                    #     bad_counts = 0
-                    #     # save current best
-                    #     self.save_checkpoint(best_epoch)
-                    # else:
-                    #     print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
-                    #         metric, best_value, best_epoch, bad_counts))
-                    #     bad_counts += 1
-                    #
-                    # if bad_counts >= self.early_stopping_patience:
-                    #     print('\tEarly stopping at epoch %d' % e)
-                    #     break
+                        metric = self.parameter['metric']
+                        # # early stopping checking
+                        # if valid_data[metric] > best_value:
+                        #     best_value = valid_data[metric]
+                        #     best_epoch = e
+                        #     print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
+                        #     bad_counts = 0
+                        #     # save current best
+                        #     self.save_checkpoint(best_epoch)
+                        # else:
+                        #     print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
+                        #         metric, best_value, best_epoch, bad_counts))
+                        #     bad_counts += 1
+                        #
+                        # if bad_counts >= self.early_stopping_patience:
+                        #     print('\tEarly stopping at epoch %d' % e)
+                        #     break
 
             previous_relation = curr_rel  # cache previous relations
 
@@ -231,18 +235,7 @@ class Trainer:
                 break
             t += 1
 
-            _, p_score, n_score = self.do_one_step(eval_task, iseval=True, curr_rel=curr_rel)
-
-            x = torch.cat([n_score, p_score], 1).squeeze()
-
-            self.rank_predict(data, x, ranks)
-
-            # print current temp data dynamically
-            for k in data.keys():
-                temp[k] = data[k] / t
-            sys.stdout.write("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
-            sys.stdout.flush()
+            self.get_epoch_score(curr_rel, data, eval_task, ranks, t, temp)
 
             if t == data_loader.tasks_relations_num[i] + previous_t:
                 # cache task score
@@ -262,11 +255,60 @@ class Trainer:
         # else:
         #     self.logging_eval_data(data, self.state_dict_file, istest)
 
-        print(tasks_data)  # TODO: update print way
+        print('continual learning', tasks_data)  # TODO: update print way
         # print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
         #     t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
         return data
+
+    def fw_eval(self, istest=False, epoch=None):
+        self.metaR.eval()
+        # clear sharing rel_q
+        self.metaR.rel_q_sharing = dict()
+
+        data_loader = self.test_data_loader if istest is True else self.fw_dev_data_loader
+        data_loader.curr_tri_idx = 0
+
+        # initial return data of validation
+        data = {'MRR': 0, 'Hits@1': 0, 'Hits@5': 0, 'Hits@10': 0}
+        ranks = []
+
+        t = 0
+        temp = dict()
+        while True:
+            # sample all the eval tasks
+            eval_task, curr_rel = data_loader.next_one_on_eval()
+            # at the end of sample tasks, a symbol 'EOT' will return
+            if eval_task == 'EOT':
+                break
+            t += 1
+            self.get_epoch_score(curr_rel, data, eval_task, ranks, t, temp)
+
+        # print overall evaluation result and return it
+        for k in data.keys():
+            data[k] = round(data[k] / t, 3)
+
+        if self.parameter['step'] == 'train':
+            self.logging_training_data(data, epoch)
+        else:
+            self.logging_eval_data(data, self.state_dict_file, istest)
+
+        print("few shot {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
+            t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+
+        return data
+
+    def get_epoch_score(self, curr_rel, data, eval_task, ranks, t, temp):
+        _, p_score, n_score = self.do_one_step(eval_task, iseval=True, curr_rel=curr_rel)
+        x = torch.cat([n_score, p_score], 1).squeeze()
+        self.rank_predict(data, x, ranks)
+
+        # print current temp data dynamically
+        for k in data.keys():
+            temp[k] = data[k] / t
+        sys.stdout.write("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
+            t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
+        sys.stdout.flush()
 
     def eval_by_relation(self, istest=False, epoch=None):
         self.metaR.eval()
