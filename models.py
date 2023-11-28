@@ -104,8 +104,9 @@ class MetaR(nn.Module):
                 sup_neg_e1, sup_neg_e2 = self.split_concat(support, support_negative)
 
                 p_score, n_score = self.embedding_learner(sup_neg_e1, sup_neg_e2, rel_s, few)
-
-                y = torch.ones(p_score.shape[0], 1)  # TODO: may update y shape
+                
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                y = torch.ones(p_score.shape[0], 1).to(device)
                 # y = torch.Tensor([1]).to(self.device)
                 self.zero_grad()
                 loss = self.loss_func(p_score, n_score, y)

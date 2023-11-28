@@ -111,7 +111,7 @@ class Trainer:
         logging.info(f"Eval Continual Learning task {task}")
         for i, data in enumerate(metrics):
             logging.info("Task: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                i, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+                str(i), data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
     def logging_eval_data(self, data, state_path, istest=False):
         setname = 'dev set'
@@ -273,9 +273,9 @@ class Trainer:
 
         print('continual learning', tasks_data)
         if self.parameter['step'] == 'train':
-            self.logging_cl_training_data(data, epoch)
+            self.logging_cl_training_data(tasks_data, epoch)
 
-        return data
+        return tasks_data
 
     def fw_eval(self, istest=False, epoch=None):
         self.metaR.eval()
