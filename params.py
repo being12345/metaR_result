@@ -62,6 +62,7 @@ data_dir = {
     'train_tasks': '/continual_train_tasks.json',
     'test_tasks': '/test_tasks.json',
     'dev_tasks': '/continual_dev_tasks.json',
+    'few_shot_dev_tasks': '/dev_tasks.json',
 
     'rel2candidates_in_train': '/rel2candidates_in_train.json',
     'rel2candidates': '/rel2candidates.json',

@@ -35,8 +35,10 @@ if __name__ == '__main__':
     dataset['train_tasks'] = json.load(open(data_dir['train_tasks' + tail]))
     print("loading test_tasks ... ...")
     dataset['test_tasks'] = json.load(open(data_dir['test_tasks']))
-    print("loading dev_tasks ... ...")
+    print("loading continual learning dev_tasks ... ...")
     dataset['dev_tasks'] = json.load(open(data_dir['dev_tasks']))
+    print("loading few shot dev_tasks ... ...")
+    dataset['few_shot_dev_tasks'] = json.load(open(data_dir['few_shot_dev_tasks']))
     print("loading rel2candidates{} ... ...".format(tail))
     dataset['rel2candidates'] = json.load(open(data_dir['rel2candidates' + tail]))
     print("loading e1rel_e2{} ... ...".format(tail))
@@ -53,6 +55,7 @@ if __name__ == '__main__':
     # data_loader
     train_data_loader = DataLoader(dataset, params, step='train')
     dev_data_loader = DataLoader(dataset, params, step='dev')
+    few_shot_dev_data_loader = DataLoader(dataset, params, step='few_shot_dev')
     test_data_loader = DataLoader(dataset, params, step='test')
     data_loaders = [train_data_loader, dev_data_loader, test_data_loader]
 
