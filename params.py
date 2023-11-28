@@ -11,8 +11,8 @@ def get_params():
     args.add_argument("-few", "--few", default=3, type=int)
     # args.add_argument("-few", "--few", default=1, type=int)
     args.add_argument("-nq", "--num_query", default=3, type=int)
-    args.add_argument("-bfew", "--base_classes_few", default=10, type=int)
-    args.add_argument("-bnq", "--base_classes_num_query", default=30, type=int)
+    args.add_argument("-bfew", "--base_classes_few", default=3, type=int)
+    args.add_argument("-bnq", "--base_classes_num_query", default=3, type=int)
     args.add_argument("-br", "--base_classes_relation", default=30, type=int)
     args.add_argument("-metric", "--metric", default="MRR", choices=["MRR", "Hits@10", "Hits@5", "Hits@1"])
 

@@ -21,6 +21,7 @@ class DataLoader(object):
 
         if step != 'train':
             self.eval_triples = []
+            self.tasks_relations_num = []
             # for rel in self.all_rels:
             #     self.eval_triples.extend(self.tasks[rel][self.few:])    # TODO: why? rest of triple? get almost triples
             # self.num_tris = len(self.eval_triples)
