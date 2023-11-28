@@ -65,10 +65,10 @@ if __name__ == '__main__':
 
     if params['step'] == 'train':
         trainer.train()
-        print("test")
-        print(params['prefix'])
-        trainer.reload()
-        trainer.eval(istest=True)
+        # print("test")
+        # print(params['prefix'])
+        # trainer.reload()
+        # trainer.eval(istest=True)
     elif params['step'] == 'test':
         print(params['prefix'])
         if params['eval_by_rel']:

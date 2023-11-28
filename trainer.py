@@ -87,18 +87,31 @@ class Trainer:
         shutil.copy(os.path.join(self.ckpt_dir, 'state_dict_' + str(best_epoch) + '.ckpt'),
                     os.path.join(self.state_dir, 'state_dict'))
 
-    def write_training_log(self, data, epoch):
-        self.writer.add_scalar('Training_Loss', data['Loss'], epoch)
+    def write_training_log(self, data, task, epoch):
+        self.writer.add_scalar(f'Training_Loss_{task}', data['Loss'], epoch)
 
-    def write_validating_log(self, data, epoch):
-        self.writer.add_scalar('Validating_MRR', data['MRR'], epoch)
-        self.writer.add_scalar('Validating_Hits_10', data['Hits@10'], epoch)
-        self.writer.add_scalar('Validating_Hits_5', data['Hits@5'], epoch)
-        self.writer.add_scalar('Validating_Hits_1', data['Hits@1'], epoch)
+    def write_fw_validating_log(self, data, task, epoch):
+        self.writer.add_scalar(f'Few Shot Validating_MRR_{task}', data['MRR'], epoch)
+        self.writer.add_scalar(f'Few Shot Validating_Hits_10_{task}', data['Hits@10'], epoch)
+        self.writer.add_scalar(f'Few Shot Validating_Hits_5_{task}', data['Hits@5'], epoch)
+        self.writer.add_scalar(f'Few Shot Validating_Hits_1_{task}', data['Hits@1'], epoch)
 
-    def logging_training_data(self, data, epoch):
+    def write_cl_validating_log(self, metrics, task):
+        for i, data in enumerate(metrics):
+            self.writer.add_scalar(f'Continual Learning Validating_MRR_{task}', data['MRR'], i)
+            self.writer.add_scalar(f'Continual Learning Validating_Hits_10_{task}', data['Hits@10'], i)
+            self.writer.add_scalar(f'Continual Learning Validating_Hits_5_{task}', data['Hits@5'], i)
+            self.writer.add_scalar(f'Continual Learning Validating_Hits_1_{task}', data['Hits@1'], i)
+
+    def logging_fw_training_data(self, data, epoch):
         logging.info("Epoch: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             epoch, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+
+    def logging_cl_training_data(self, metrics, task):
+        logging.info(f"Eval Continual Learning task {task}")
+        for i, data in enumerate(metrics):
+            logging.info("Task: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
+                i, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
     def logging_eval_data(self, data, state_path, istest=False):
         setname = 'dev set'
@@ -157,26 +170,29 @@ class Trainer:
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
                 # Test train_task num
                 loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
-                if e == 0:  # TODO: test module move later
-                    test_task(train_task)
-                    # # print the loss on specific epoch
-                # if e % self.print_epoch == 0:
-                #     loss_num = loss.item()
-                #     self.write_training_log({'Loss': loss_num}, e)
-                #     print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
+                # if e == 0:  # TODO: test module move later
+                #     test_task(train_task)
+
+                # print the loss on specific epoch
+                if e % self.print_epoch == 0:
+                    loss_num = loss.item()
+                    self.write_training_log({'Loss': loss_num}, task, e)
+                    print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
                 # # save checkpoint on specific epoch
                 # if e % self.checkpoint_epoch == 0 and e != 0:
                 #     print('Epoch  {} has finished, saving...'.format(e))
                 #     self.save_checkpoint(e)
+
                 # do evaluation on specific epoch
                 if e % self.eval_epoch == 0 and e != 0:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
-                    self.fw_eval(istest=False, epoch=e)  # few shot val
-                    if task != 0:
+                    valid_data = self.fw_eval(istest=False, epoch=e)  # few shot val
+                    self.write_fw_validating_log(valid_data, task, e)
+                    if task != 0 and e == self.epoch - 1:
                         print('Epoch  {} has finished, validating continual learning...'.format(e))
                         valid_data = self.novel_continual_eval(previous_relation, istest=False,
-                                                               epoch=e)  # continual learning val
-                        self.write_validating_log(valid_data, e)
+                                                               epoch=e)  # continual learning val only in last epoch
+                        self.write_cl_validating_log(valid_data, task)
 
                         metric = self.parameter['metric']
                         # # early stopping checking
@@ -200,7 +216,7 @@ class Trainer:
 
         print('Training has finished')
         print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
-        self.save_best_state_dict(best_epoch)
+        # self.save_best_state_dict(best_epoch)
         print('Finish')
 
     def novel_continual_eval(self, previous_rel, istest=False, epoch=None):
@@ -255,9 +271,9 @@ class Trainer:
         # else:
         #     self.logging_eval_data(data, self.state_dict_file, istest)
 
-        print('continual learning', tasks_data)  # TODO: update print way
-        # print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-        #     t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+        print('continual learning', tasks_data)
+        if self.parameter['step'] == 'train':
+            self.logging_cl_training_data(data, epoch)
 
         return data
 
@@ -289,7 +305,7 @@ class Trainer:
             data[k] = round(data[k] / t, 3)
 
         if self.parameter['step'] == 'train':
-            self.logging_training_data(data, epoch)
+            self.logging_fw_training_data(data, epoch)
         else:
             self.logging_eval_data(data, self.state_dict_file, istest)
 
