@@ -192,6 +192,7 @@ class Trainer:
                     self.write_fw_validating_log(valid_data, task, e)
                 if task != 0 and e == self.epoch - 1:
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
+                    
                     valid_data = self.novel_continual_eval(previous_relation, task,
                                                            istest=False)  # continual learning val only in last epoch
                     self.write_cl_validating_log(valid_data, task)
@@ -276,7 +277,6 @@ class Trainer:
         print('continual learning', tasks_data)
         if self.parameter['step'] == 'train':
             self.logging_cl_training_data(tasks_data, task)
-
         return tasks_data
 
     def fw_eval(self, task, istest=False, epoch=None):
