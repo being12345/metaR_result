@@ -276,12 +276,7 @@ class Trainer:
 
         print('continual learning', tasks_data)
         if self.parameter['step'] == 'train':
-<<<<<<< HEAD
-            self.logging_cl_training_data(tasks_data, epoch)
-=======
             self.logging_cl_training_data(tasks_data, task)
->>>>>>> refs/remotes/origin/log
-
         return tasks_data
 
     def fw_eval(self, task, istest=False, epoch=None):
