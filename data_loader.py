@@ -19,7 +19,7 @@ class DataLoader(object):
         self.nq = parameter['num_query']
         self.bs = parameter['batch_size']
 
-        if step == 'few_shot_dev':
+        if step == 'fw_dev':
             self.eval_triples = []
             for rel in self.all_rels:
                 self.eval_triples.extend(self.tasks[rel][self.few:])

@@ -22,9 +22,9 @@ def get_params():
     args.add_argument("-es_p", "--early_stopping_patience", default=30, type=int)
 
     # args.add_argument("-epo", "--epoch", default=100000, type=int)
-    args.add_argument("-epo", "--epoch", default=1000, type=int)
-    args.add_argument("-prt_epo", "--print_epoch", default=100, type=int)
-    args.add_argument("-eval_epo", "--eval_epoch", default=500, type=int)
+    args.add_argument("-epo", "--epoch", default=500, type=int)
+    args.add_argument("-prt_epo", "--print_epoch", default=50, type=int)
+    args.add_argument("-eval_epo", "--eval_epoch", default=250, type=int)
     # args.add_argument("-eval_epo", "--eval_epoch", default=1000, type=int)
     args.add_argument("-ckpt_epo", "--checkpoint_epoch", default=1000, type=int)
 
