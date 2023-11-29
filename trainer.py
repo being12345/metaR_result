@@ -188,13 +188,13 @@ class Trainer:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
                     valid_data = self.fw_eval(istest=False, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, task, e)
-                    if task != 0 and e == self.epoch - 1:
-                        print('Epoch  {} has finished, validating continual learning...'.format(e))
-                        valid_data = self.novel_continual_eval(previous_relation, istest=False,
-                                                               epoch=e)  # continual learning val only in last epoch
-                        self.write_cl_validating_log(valid_data, task)
+                if task != 0 and e == self.epoch - 1:
+                    print('Epoch  {} has finished, validating continual learning...'.format(e))
+                    valid_data = self.novel_continual_eval(previous_relation, istest=False,
+                                                           epoch=e)  # continual learning val only in last epoch
+                    self.write_cl_validating_log(valid_data, task)
 
-                        metric = self.parameter['metric']
+                    metric = self.parameter['metric']
                         # # early stopping checking
                         # if valid_data[metric] > best_value:
                         #     best_value = valid_data[metric]
