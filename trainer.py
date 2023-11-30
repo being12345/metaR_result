@@ -1,3 +1,5 @@
+import numpy as np
+
 from models import *
 from tensorboardX import SummaryWriter
 import os
@@ -54,6 +56,7 @@ class Trainer:
         # logging
         logging_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'], 'res.log')
         logging.basicConfig(filename=logging_dir, level=logging.INFO, format="%(asctime)s - %(message)s")
+        self.csv_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'], 'val.csv')
 
         # load state_dict and params
         if parameter['step'] in ['test', 'dev']:
@@ -90,18 +93,22 @@ class Trainer:
     def write_training_log(self, data, task, epoch):
         self.writer.add_scalar(f'Training_Loss_{task}', data['Loss'], epoch)
 
-    def write_fw_validating_log(self, data, task, epoch):
+    def write_fw_validating_log(self, data, record, task, epoch):
         self.writer.add_scalar(f'Few_Shot_Validating_MRR_{task}', data['MRR'], epoch)
         self.writer.add_scalar(f'Few_Shot_Validating_Hits_10_{task}', data['Hits@10'], epoch)
         self.writer.add_scalar(f'Few_Shot_Validating_Hits_5_{task}', data['Hits@5'], epoch)
         self.writer.add_scalar(f'Few_Shot_Validating_Hits_1_{task}', data['Hits@1'], epoch)
 
-    def write_cl_validating_log(self, metrics, task):
+        if epoch + self.eval_epoch >= self.epoch:
+            record[task, task] = data['MRR']
+
+    def write_cl_validating_log(self, metrics, record, task):
         for i, data in enumerate(metrics):
             self.writer.add_scalar(f'Continual_Learning_Validating_MRR_{task}', data['MRR'], i)
             self.writer.add_scalar(f'Continual_Learning_Validating_Hits_10_{task}', data['Hits@10'], i)
             self.writer.add_scalar(f'Continual_Learning_Validating_Hits_5_{task}', data['Hits@5'], i)
             self.writer.add_scalar(f'Continual_Learning_Validating_Hits_1_{task}', data['Hits@1'], i)
+            record[task, i] = data['MRR']
 
     def logging_fw_training_data(self, data, epoch, task):
         if epoch == self.eval_epoch:
@@ -162,6 +169,7 @@ class Trainer:
         best_value = 0
         bad_counts = 0
         num_tasks = 8  # TODO: update it in parser
+        val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
 
         for task in range(num_tasks):
             # training by epoch
@@ -189,13 +197,13 @@ class Trainer:
                 if e % self.eval_epoch == 0 and e != 0:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
                     valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
-                    self.write_fw_validating_log(valid_data, task, e)
+                    self.write_fw_validating_log(valid_data, val_mat, task, e)
                 if task != 0 and e == self.epoch - 1:
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
-                    
+
                     valid_data = self.novel_continual_eval(previous_relation, task,
                                                            istest=False)  # continual learning val only in last epoch
-                    self.write_cl_validating_log(valid_data, task)
+                    self.write_cl_validating_log(valid_data, val_mat, task)
 
                     # metric = self.parameter['metric']
                     # # early stopping checking
@@ -217,6 +225,7 @@ class Trainer:
 
             previous_relation = curr_rel  # cache previous relations
 
+        np.savetxt(self.csv_dir, val_mat, delimiter=",")
         print('Training has finished')
         # print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
         # self.save_best_state_dict(best_epoch)
