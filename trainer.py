@@ -158,16 +158,14 @@ class Trainer:
             loss = self.metaR.loss_func(p_score, n_score, y)
             loss.backward()
 
-        # Continual Subnet no backprop
-        if consolidated_masks is not None and consolidated_masks != {}:  # Only do this for tasks 1 and beyond
-            # if args.use_continual_masks:
-            for key in consolidated_masks.keys():
-                # Determine whether it's an output head or not
-                module_name, module_attr = key.split('.')  # e.g. fc1.weight
-                # Zero-out gradients
-                if hasattr(getattr(self.metaR.relation_learner, module_name), module_attr):
-                    if getattr(getattr(self.metaR.relation_learner, module_name), module_attr) is not None:
-                        getattr(getattr(self.metaR.relation_learner, module_name), module_attr).grad[consolidated_masks[key] == 1.0] = 0
+            # Continual Subnet no backprop
+            if consolidated_masks is not None and consolidated_masks != {}:  # Only do this for tasks 1 and beyond
+                for key in consolidated_masks.keys():
+                    module_name, module_attr = key.split('.')  # e.g. fc1.weight
+                    # Zero-out gradients
+                    if hasattr(getattr(self.metaR.relation_learner, module_name), module_attr):
+                        if getattr(getattr(self.metaR.relation_learner, module_name), module_attr) is not None:
+                            getattr(getattr(self.metaR.relation_learner, module_name), module_attr).grad[consolidated_masks[key] == 1.0] = 0
             self.optimizer.step()
         elif curr_rel != '':
             p_score, n_score = self.metaR(task, iseval, curr_rel)
