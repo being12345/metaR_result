@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from models import *
@@ -146,7 +148,7 @@ class Trainer:
             data['Hits@1'] += 1
         data['MRR'] += 1.0 / rank
 
-    def do_one_step(self, task, iseval=False, curr_rel=''):
+    def do_one_step(self, task, consolidated_masks, iseval=False, curr_rel=''):
         loss, p_score, n_score = 0, 0, 0
         if not iseval:
             self.optimizer.zero_grad()
@@ -155,6 +157,17 @@ class Trainer:
             # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
             loss.backward()
+
+        # Continual Subnet no backprop
+        if consolidated_masks is not None and consolidated_masks != {}:  # Only do this for tasks 1 and beyond
+            # if args.use_continual_masks:
+            for key in consolidated_masks.keys():
+                # Determine whether it's an output head or not
+                module_name, module_attr = key.split('.')  # e.g. fc1.weight
+                # Zero-out gradients
+                if hasattr(getattr(self.metaR.relation_learner, module_name), module_attr):
+                    if getattr(getattr(self.metaR.relation_learner, module_name), module_attr) is not None:
+                        getattr(getattr(self.metaR.relation_learner, module_name), module_attr).grad[consolidated_masks[key] == 1.0] = 0
             self.optimizer.step()
         elif curr_rel != '':
             p_score, n_score = self.metaR(task, iseval, curr_rel)
@@ -169,6 +182,7 @@ class Trainer:
         best_value = 0
         bad_counts = 0
         num_tasks = 8  # TODO: update it in parser
+        per_task_masks, consolidated_masks = {}, {}
         val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
 
         for task in range(num_tasks):
@@ -179,7 +193,7 @@ class Trainer:
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
                 # Test train_task num
-                loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
+                loss, _, _ = self.do_one_step(train_task, consolidated_masks, iseval=False, curr_rel=curr_rel)
                 # if e == 0:  # TODO: test module move later
                 #     test_task(train_task)
 
@@ -224,6 +238,16 @@ class Trainer:
                     #     break
 
             previous_relation = curr_rel  # cache previous relations
+
+            # Consolidate task masks to keep track of parameters to-update or not
+            per_task_masks[task] = self.metaR.relation_learner.get_masks(task)
+            if task == 0:
+                consolidated_masks = deepcopy(per_task_masks[task])
+            else:
+                for key in per_task_masks[task].keys():
+                    # Operation on sparsity
+                    if consolidated_masks[key] is not None and per_task_masks[task][key] is not None:
+                        consolidated_masks[key] = 1 - ((1 - consolidated_masks[key]) * (1 - per_task_masks[task][key]))
 
         np.savetxt(self.csv_dir, val_mat, delimiter=",")
         print('Training has finished')

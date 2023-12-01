@@ -41,23 +41,18 @@ class SubnetLinear(nn.Linear):
         # Init Mask Parameters
         self.init_mask_parameters()
 
-        self.Uf = None
-
         if trainable == False:
             raise Exception("Non-trainable version is not yet implemented")
 
     def forward(self, x, weight_mask=None, bias_mask=None, mode="train"):
         w_pruned, b_pruned = None, None
         # If training, Get the subnet by sorting the scores
-        assert mode == "train"  # TODO: remove latter 
+        assert mode == "train"  # TODO: remove latter
         if mode == "train":
-            if weight_mask is None:
-                self.weight_mask = GetSubnetFaster.apply(self.w_m.abs(),
-                                                         self.zeros_weight,
-                                                         self.ones_weight,
-                                                         self.sparsity)
-            else:
-                self.weight_mask = weight_mask
+            self.weight_mask = GetSubnetFaster.apply(self.w_m.abs(),
+                                                     self.zeros_weight,
+                                                     self.ones_weight,
+                                                     self.sparsity) if weight_mask is None else weight_mask
             w_pruned = self.weight_mask * self.weight
             b_pruned = None
             if self.bias is not None:
