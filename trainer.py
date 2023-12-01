@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 
-from models import *
+from network.param_emb_models import *
 from tensorboardX import SummaryWriter
 import os
 import sys
@@ -210,7 +210,7 @@ class Trainer:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
                     valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, val_mat, task, e)
-                if task != 0 and e == self.epoch - 1:
+                if task != 0 and e == self.epoch - 1 and task == -1:   # TODO: remove latter
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
 
                     valid_data = self.novel_continual_eval(previous_relation, task,

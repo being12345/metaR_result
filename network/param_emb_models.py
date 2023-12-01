@@ -11,14 +11,14 @@ class PERelationMetaLearner(nn.Module):
         self.embed_size = embed_size
         self.few = few
         self.out_size = out_size
+        self.fc1 = SubnetLinear(2 * embed_size, num_hidden1, sparsity=sparsity, bias=False)
         self.rel_fc1 = nn.Sequential(OrderedDict([
-            ('fc', SubnetLinear(2 * embed_size, num_hidden1, sparsity=sparsity, bias=False)),  # TODO: more params
             # ('bn', nn.BatchNorm1d(few)),    # TODO: why batchnorm1d with few
             ('relu', nn.LeakyReLU()),
             ('drop', nn.Dropout(p=dropout_p)),
         ]))
+        self.fc2 = SubnetLinear(num_hidden1, num_hidden2, sparsity=sparsity, bias=False)
         self.rel_fc2 = nn.Sequential(OrderedDict([
-            ('fc', SubnetLinear(num_hidden1, num_hidden2, sparsity=sparsity, bias=False)),
             # ('bn', nn.BatchNorm1d(few)),
             ('relu', nn.LeakyReLU()),
             ('drop', nn.Dropout(p=dropout_p)),
@@ -35,8 +35,8 @@ class PERelationMetaLearner(nn.Module):
                 self.none_masks[name + '.weight'] = None
                 self.none_masks[name + '.bias'] = None
 
-        nn.init.xavier_normal_(self.rel_fc1.fc.weight)
-        nn.init.xavier_normal_(self.rel_fc2.fc.weight)
+        nn.init.xavier_normal_(self.fc1.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
         nn.init.xavier_normal_(self.rel_fc3.fc.weight)
 
     def forward(self, inputs, mask, mode="train"):
@@ -45,9 +45,11 @@ class PERelationMetaLearner(nn.Module):
 
         size = inputs.shape
         x = inputs.contiguous().view(size[0], size[1], -1)
-        x = self.rel_fc1(x, weight_mask=mask['fc1.weight'], bias_mask=mask['fc1.bias'], mode=mode)
-        x = self.rel_fc2(x, weight_mask=mask['fc1.weight'], bias_mask=mask['fc1.bias'], mode=mode)
-        x = self.rel_fc3(x, weight_mask=mask['fc1.weight'], bias_mask=mask['fc1.bias'], mode=mode)
+        x = self.fc1(x, weight_mask=mask['fc1.weight'], bias_mask=mask['fc1.bias'], mode=mode)
+        x = self.rel_fc1(x)
+        x = self.fc2(x, weight_mask=mask['fc2.weight'], bias_mask=mask['fc1.bias'], mode=mode)
+        x = self.rel_fc2(x)
+        x = self.rel_fc3(x)
         x = torch.mean(x, 1)
 
         return x.view(size[0], 1, 1, self.out_size)
@@ -56,7 +58,6 @@ class PERelationMetaLearner(nn.Module):
         task_mask = {}
         for name, module in self.named_modules():
             if isinstance(module, SubnetLinear):
-                print(name)
                 task_mask[name + '.weight'] = (module.weight_mask.detach().clone() > 0).type(torch.long)
                 task_mask[name + '.bias'] = (module.bias_mask.detach().clone() > 0).type(torch.long) \
                     if getattr(module, 'bias') is not None else None
@@ -113,7 +114,7 @@ class MetaR(nn.Module):
         num_q = query.shape[1]  # num of query
         num_n = negative.shape[1]  # num of query negative
 
-        rel = self.relation_learner(support)  # FC
+        rel = self.relation_learner(support, None)  # FC
         rel.retain_grad()
 
         # relation for support
