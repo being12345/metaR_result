@@ -181,7 +181,7 @@ class Trainer:
         Hit1_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
         Hit5_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
         Hit10_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
-        val_mat = [MRR_val_mat, Hit1_val_mat, Hit5_val_mat, Hit10_val_mat]
+        val_mat = [MRR_val_mat, Hit10_val_mat, Hit5_val_mat, Hit1_val_mat]
 
         for task in range(num_tasks):
             # training by epoch
