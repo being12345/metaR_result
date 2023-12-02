@@ -1,3 +1,5 @@
+import numpy as np
+
 from models import *
 from tensorboardX import SummaryWriter
 import os
@@ -30,8 +32,10 @@ class Trainer:
         self.early_stopping_patience = parameter['early_stopping_patience']
         # epoch
         self.epoch = parameter['epoch']
+        self.base_epoch = parameter['base_epoch']
         self.print_epoch = parameter['print_epoch']
         self.eval_epoch = parameter['eval_epoch']
+        self.base_eval_epoch = parameter['base_eval_epoch']
         self.checkpoint_epoch = parameter['checkpoint_epoch']
         # device
         self.device = parameter['device']
@@ -54,6 +58,7 @@ class Trainer:
         # logging
         logging_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'], 'res.log')
         logging.basicConfig(filename=logging_dir, level=logging.INFO, format="%(asctime)s - %(message)s")
+        self.csv_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'])
 
         # load state_dict and params
         if parameter['step'] in ['test', 'dev']:
@@ -87,18 +92,43 @@ class Trainer:
         shutil.copy(os.path.join(self.ckpt_dir, 'state_dict_' + str(best_epoch) + '.ckpt'),
                     os.path.join(self.state_dir, 'state_dict'))
 
-    def write_training_log(self, data, epoch):
-        self.writer.add_scalar('Training_Loss', data['Loss'], epoch)
+    def write_training_log(self, data, task, epoch):
+        self.writer.add_scalar(f'Training_Loss_{task}', data['Loss'], epoch)
 
-    def write_validating_log(self, data, epoch):
-        self.writer.add_scalar('Validating_MRR', data['MRR'], epoch)
-        self.writer.add_scalar('Validating_Hits_10', data['Hits@10'], epoch)
-        self.writer.add_scalar('Validating_Hits_5', data['Hits@5'], epoch)
-        self.writer.add_scalar('Validating_Hits_1', data['Hits@1'], epoch)
+    def write_fw_validating_log(self, data, record, task, epoch):
+        self.writer.add_scalar(f'Few_Shot_Validating_MRR_{task}', data['MRR'], epoch)
+        self.writer.add_scalar(f'Few_Shot_Validating_Hits_10_{task}', data['Hits@10'], epoch)
+        self.writer.add_scalar(f'Few_Shot_Validating_Hits_5_{task}', data['Hits@5'], epoch)
+        self.writer.add_scalar(f'Few_Shot_Validating_Hits_1_{task}', data['Hits@1'], epoch)
 
-    def logging_training_data(self, data, epoch):
+        if epoch + self.eval_epoch >= self.epoch:
+            record[0][task, task] = data['MRR']
+            record[1][task, task] = data['Hits@10']
+            record[2][task, task] = data['Hits@5']
+            record[3][task, task] = data['Hits@1']
+
+    def write_cl_validating_log(self, metrics, record, task):
+        for i, data in enumerate(metrics):
+            self.writer.add_scalar(f'Continual_Learning_Validating_MRR_{task}', data['MRR'], i)
+            self.writer.add_scalar(f'Continual_Learning_Validating_Hits_10_{task}', data['Hits@10'], i)
+            self.writer.add_scalar(f'Continual_Learning_Validating_Hits_5_{task}', data['Hits@5'], i)
+            self.writer.add_scalar(f'Continual_Learning_Validating_Hits_1_{task}', data['Hits@1'], i)
+            record[0][task, i] = data['MRR']
+            record[1][task, i] = data['Hits@10']
+            record[2][task, i] = data['Hits@5']
+            record[3][task, i] = data['Hits@1']
+
+    def logging_fw_training_data(self, data, epoch, task):
+        if epoch == self.eval_epoch:
+            logging.info(f"Few_Shot_Learning_task {task}")
         logging.info("Epoch: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             epoch, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+
+    def logging_cl_training_data(self, metrics, task):
+        logging.info(f"Eval_Continual_Learning_task {task}")
+        for i, data in enumerate(metrics):
+            logging.info("Task: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
+                str(i), data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
     def logging_eval_data(self, data, state_path, istest=False):
         setname = 'dev set'
@@ -147,75 +177,90 @@ class Trainer:
         best_value = 0
         bad_counts = 0
         num_tasks = 8  # TODO: update it in parser
+        MRR_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        Hit1_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        Hit5_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        Hit10_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        val_mat = [MRR_val_mat, Hit1_val_mat, Hit5_val_mat, Hit10_val_mat]
 
         for task in range(num_tasks):
             # training by epoch
-            for e in range(self.epoch):
+            epoch = self.base_epoch if task == 0 else self.epoch
+            eval_epoch = self.base_eval_epoch if task == 0 else self.eval_epoch
+            for e in range(epoch):
                 is_last = False if e != self.epoch - 1 else True
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
                 # Test train_task num
                 loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
-                if e == 0:  # TODO: test module move later
-                    test_task(train_task)
-                    # # print the loss on specific epoch
-                # if e % self.print_epoch == 0:
-                #     loss_num = loss.item()
-                #     self.write_training_log({'Loss': loss_num}, e)
-                #     print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
+                # if e == 0:  # TODO: test module move later
+                #     test_task(train_task)
+
+                # print the loss on specific epoch
+                if e % self.print_epoch == 0:
+                    loss_num = loss.item()
+                    self.write_training_log({'Loss': loss_num}, task, e)
+                    print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
                 # # save checkpoint on specific epoch
                 # if e % self.checkpoint_epoch == 0 and e != 0:
                 #     print('Epoch  {} has finished, saving...'.format(e))
                 #     self.save_checkpoint(e)
-                # do evaluation on specific epoch
-                if e % self.eval_epoch == 0 and e != 0:
-                    print('Epoch  {} has finished, validating few shot...'.format(e))
-                    self.fw_eval(istest=False, epoch=e)  # few shot val
-                    if task != 0:
-                        print('Epoch  {} has finished, validating continual learning...'.format(e))
-                        valid_data = self.novel_continual_eval(previous_relation, istest=False,
-                                                               epoch=e)  # continual learning val
-                        self.write_validating_log(valid_data, e)
 
-                        metric = self.parameter['metric']
-                        # # early stopping checking
-                        # if valid_data[metric] > best_value:
-                        #     best_value = valid_data[metric]
-                        #     best_epoch = e
-                        #     print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
-                        #     bad_counts = 0
-                        #     # save current best
-                        #     self.save_checkpoint(best_epoch)
-                        # else:
-                        #     print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
-                        #         metric, best_value, best_epoch, bad_counts))
-                        #     bad_counts += 1
-                        #
-                        # if bad_counts >= self.early_stopping_patience:
-                        #     print('\tEarly stopping at epoch %d' % e)
-                        #     break
+                # do evaluation on specific epoch
+                if e % eval_epoch == 0 and e != 0:
+                    print('Epoch  {} has finished, validating few shot...'.format(e))
+                    valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
+                    self.write_fw_validating_log(valid_data, val_mat, task, e)
+                if task != 0 and e == self.epoch - 1:
+                    print('Epoch  {} has finished, validating continual learning...'.format(e))
+
+                    valid_data = self.novel_continual_eval(previous_relation, task,
+                                                           istest=False)  # continual learning val only in last epoch
+                    self.write_cl_validating_log(valid_data, val_mat, task)
+
+                    # metric = self.parameter['metric']
+                    # # early stopping checking
+                    # if valid_data[metric] > best_value:
+                    #     best_value = valid_data[metric]
+                    #     best_epoch = e
+                    #     print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
+                    #     bad_counts = 0
+                    #     # save current best
+                    #     self.save_checkpoint(best_epoch)
+                    # else:
+                    #     print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
+                    #         metric, best_value, best_epoch, bad_counts))
+                    #     bad_counts += 1
+                    #
+                    # if bad_counts >= self.early_stopping_patience:
+                    #     print('\tEarly stopping at epoch %d' % e)
+                    #     break
 
             previous_relation = curr_rel  # cache previous relations
 
+        np.savetxt(os.path.join(self.csv_dir, 'MRR.csv'), MRR_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@10.csv'), Hit10_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@5.csv'), Hit5_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@1.csv'), Hit1_val_mat, delimiter=",")
         print('Training has finished')
-        print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
-        self.save_best_state_dict(best_epoch)
+        # print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
+        # self.save_best_state_dict(best_epoch)
         print('Finish')
 
-    def novel_continual_eval(self, previous_rel, istest=False, epoch=None):
+    def novel_continual_eval(self, previous_rel, task, istest=False):
         self.metaR.eval()
         # clear sharing rel_q
         self.metaR.rel_q_sharing = dict()
 
         data_loader = self.test_data_loader if istest is True else self.dev_data_loader
-        if epoch == self.eval_epoch:  # it's first eval epoch, add relation triples
-            current_eval_num = 0
-            for rel in previous_rel:
-                data_loader.eval_triples.extend(data_loader.tasks[rel][self.few:])
-                current_eval_num += len(data_loader.tasks[rel][self.few:])
-            data_loader.num_tris = len(data_loader.eval_triples)
-            data_loader.tasks_relations_num.append(current_eval_num)
+        # if epoch == self.eval_epoch:  # only eval cl in last epoch
+        current_eval_num = 0
+        for rel in previous_rel:
+            data_loader.eval_triples.extend(data_loader.tasks[rel][self.few:])
+            current_eval_num += len(data_loader.tasks[rel][self.few:])
+        data_loader.num_tris = len(data_loader.eval_triples)
+        data_loader.tasks_relations_num.append(current_eval_num)
         data_loader.curr_tri_idx = 0
 
         # initial return data of validation
@@ -255,13 +300,12 @@ class Trainer:
         # else:
         #     self.logging_eval_data(data, self.state_dict_file, istest)
 
-        print('continual learning', tasks_data)  # TODO: update print way
-        # print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-        #     t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
+        print('continual learning', tasks_data)
+        if self.parameter['step'] == 'train':
+            self.logging_cl_training_data(tasks_data, task)
+        return tasks_data
 
-        return data
-
-    def fw_eval(self, istest=False, epoch=None):
+    def fw_eval(self, task, istest=False, epoch=None):
         self.metaR.eval()
         # clear sharing rel_q
         self.metaR.rel_q_sharing = dict()
@@ -289,7 +333,7 @@ class Trainer:
             data[k] = round(data[k] / t, 3)
 
         if self.parameter['step'] == 'train':
-            self.logging_training_data(data, epoch)
+            self.logging_fw_training_data(data, epoch, task)
         else:
             self.logging_eval_data(data, self.state_dict_file, istest)
 
@@ -363,3 +407,4 @@ class Trainer:
             all_t, all_data['MRR'], all_data['Hits@10'], all_data['Hits@5'], all_data['Hits@1']))
 
         return all_data
+
