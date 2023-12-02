@@ -115,7 +115,6 @@ class PEMetaR(nn.Module):
         num_n = negative.shape[1]  # num of query negative
 
         rel = self.relation_learner(support, None, mode)  # FC
-
         rel.retain_grad()
 
         # relation for support

@@ -30,6 +30,8 @@ class SubnetLinear(nn.Linear):
         # Mask Parameters of Weights and Bias
         self.w_m = nn.Parameter(torch.empty(out_features, in_features))
         self.weight_mask = None
+        self.weight_mask_grad = None
+        self.weight_grad = None
         self.zeros_weight, self.ones_weight = torch.zeros(self.w_m.shape), torch.ones(self.w_m.shape)
         if bias:
             self.b_m = nn.Parameter(torch.empty(out_features))
@@ -47,12 +49,14 @@ class SubnetLinear(nn.Linear):
     def forward(self, x, weight_mask=None, bias_mask=None, mode="train"):
         w_pruned, b_pruned = None, None
         # If training, Get the subnet by sorting the scores
-        if mode == "train":
+        if mode == "train" or mode == "val":
             self.weight_mask = GetSubnetFaster.apply(self.w_m.abs(),
                                                      self.zeros_weight,
                                                      self.ones_weight,
                                                      self.sparsity) if weight_mask is None else weight_mask
             w_pruned = self.weight_mask * self.weight
+            self.weight_mask_grad = self.weight_mask.grad
+            self.weight_grad = self.weight.grad
             b_pruned = None
             if self.bias is not None:
                 self.bias_mask = GetSubnetFaster.apply(self.b_m.abs(),
@@ -62,7 +66,9 @@ class SubnetLinear(nn.Linear):
                 b_pruned = self.bias_mask * self.bias
         # If inference/valid, use the last compute masks/subnetworks
 
-        elif mode == "val":
+        elif mode == "val": # TODO: problem is ?
+            # self.weight_mask.grad = self.weight_mask_grad
+            # self.weight.grad = self.weight_grad
             w_pruned = self.weight_mask * self.weight
             b_pruned = None
             if self.bias is not None:
