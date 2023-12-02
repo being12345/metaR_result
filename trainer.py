@@ -56,7 +56,7 @@ class Trainer:
         # logging
         logging_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'], 'res.log')
         logging.basicConfig(filename=logging_dir, level=logging.INFO, format="%(asctime)s - %(message)s")
-        self.csv_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'], 'val.csv')
+        self.csv_dir = os.path.join(self.parameter['log_dir'], self.parameter['prefix'])
 
         # load state_dict and params
         if parameter['step'] in ['test', 'dev']:
@@ -100,7 +100,10 @@ class Trainer:
         self.writer.add_scalar(f'Few_Shot_Validating_Hits_1_{task}', data['Hits@1'], epoch)
 
         if epoch + self.eval_epoch >= self.epoch:
-            record[task, task] = data['MRR']
+            record[0][task, task] = data['MRR']
+            record[1][task, task] = data['Hits@10']
+            record[2][task, task] = data['Hits@5']
+            record[3][task, task] = data['Hits@1']
 
     def write_cl_validating_log(self, metrics, record, task):
         for i, data in enumerate(metrics):
@@ -108,7 +111,10 @@ class Trainer:
             self.writer.add_scalar(f'Continual_Learning_Validating_Hits_10_{task}', data['Hits@10'], i)
             self.writer.add_scalar(f'Continual_Learning_Validating_Hits_5_{task}', data['Hits@5'], i)
             self.writer.add_scalar(f'Continual_Learning_Validating_Hits_1_{task}', data['Hits@1'], i)
-            record[task, i] = data['MRR']
+            record[0][task, i] = data['MRR']
+            record[1][task, i] = data['Hits@10']
+            record[2][task, i] = data['Hits@5']
+            record[3][task, i] = data['Hits@1']
 
     def logging_fw_training_data(self, data, epoch, task):
         if epoch == self.eval_epoch:
@@ -169,7 +175,11 @@ class Trainer:
         best_value = 0
         bad_counts = 0
         num_tasks = 8  # TODO: update it in parser
-        val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        MRR_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        Hit1_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        Hit5_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        Hit10_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+        val_mat = [MRR_val_mat, Hit1_val_mat, Hit5_val_mat, Hit10_val_mat]
 
         for task in range(num_tasks):
             # training by epoch
@@ -225,7 +235,10 @@ class Trainer:
 
             previous_relation = curr_rel  # cache previous relations
 
-        np.savetxt(self.csv_dir, val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'MRR.csv'), MRR_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@10.csv'), Hit10_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@5.csv'), Hit5_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@1.csv'), Hit1_val_mat, delimiter=",")
         print('Training has finished')
         # print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
         # self.save_best_state_dict(best_epoch)
