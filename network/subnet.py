@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import numpy as np
 
 
 def percentile(scores, sparsity):
@@ -23,7 +22,7 @@ class GetSubnetFaster(torch.autograd.Function):
 
 class SubnetLinear(nn.Linear):
     def __init__(self, in_features, out_features, bias=False, sparsity=0.5, trainable=True):
-        super(self.__class__, self).__init__(in_features=in_features, out_features=out_features, bias=bias)
+        super(SubnetLinear, self).__init__(in_features=in_features, out_features=out_features, bias=bias)
         self.sparsity = sparsity
         self.trainable = trainable
 
@@ -41,7 +40,7 @@ class SubnetLinear(nn.Linear):
         # Init Mask Parameters
         self.init_mask_parameters()
 
-        if trainable == False:
+        if not trainable:
             raise Exception("Non-trainable version is not yet implemented")
 
     def forward(self, x, weight_mask=None, bias_mask=None, mode="train"):
@@ -78,3 +77,18 @@ class SubnetLinear(nn.Linear):
             fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.w_m)
             bound = 1 / math.sqrt(fan_in)
             nn.init.uniform_(self.b_m, -bound, bound)
+
+
+class EntityMask(SubnetLinear):
+    def __init__(self, in_features, out_features):
+        super(EntityMask, self).__init__(in_features=in_features, out_features=out_features)
+
+    def forward(self, x, weight_mask=None, bias_mask=None, mode="train"):
+        # If training, Get the subnet by sorting the scores
+        self.weight_mask = F.sigmoid(self.w_m)
+        return F.linear(input=x, weight=self.weight_mask)
+
+
+if __name__ == '__main__':
+    model = EntityMask(2, 5)
+    print(model.w_m)
