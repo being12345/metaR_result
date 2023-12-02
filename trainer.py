@@ -407,4 +407,3 @@ class Trainer:
             all_t, all_data['MRR'], all_data['Hits@10'], all_data['Hits@5'], all_data['Hits@1']))
 
         return all_data
-
