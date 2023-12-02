@@ -32,8 +32,10 @@ class Trainer:
         self.early_stopping_patience = parameter['early_stopping_patience']
         # epoch
         self.epoch = parameter['epoch']
+        self.base_epoch = parameter['base_epoch']
         self.print_epoch = parameter['print_epoch']
         self.eval_epoch = parameter['eval_epoch']
+        self.base_eval_epoch = parameter['base_eval_epoch']
         self.checkpoint_epoch = parameter['checkpoint_epoch']
         # device
         self.device = parameter['device']
@@ -183,7 +185,9 @@ class Trainer:
 
         for task in range(num_tasks):
             # training by epoch
-            for e in range(self.epoch):
+            epoch = self.base_epoch if task == 0 else self.epoch
+            eval_epoch = self.base_eval_epoch if task == 0 else self.eval_epoch
+            for e in range(epoch):
                 is_last = False if e != self.epoch - 1 else True
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
@@ -204,7 +208,7 @@ class Trainer:
                 #     self.save_checkpoint(e)
 
                 # do evaluation on specific epoch
-                if e % self.eval_epoch == 0 and e != 0:
+                if e % eval_epoch == 0 and e != 0:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
                     valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, val_mat, task, e)
