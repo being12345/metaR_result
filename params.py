@@ -20,11 +20,10 @@ def get_params():
     args.add_argument("-bs", "--batch_size", default=3, type=int)
     args.add_argument("-lr", "--learning_rate", default=0.001, type=float)
     args.add_argument("-es_p", "--early_stopping_patience", default=30, type=int)
-
+    # args.add_argument("-epo", "--epoch", default=100000, type=int)
     args.add_argument("-epo", "--epoch", default=1500, type=int)
     args.add_argument("-bepo", "--base_epoch", default=5500, type=int)
-    # args.add_argument("-epo", "--epoch", default=3, type=int)
-    args.add_argument("-prt_epo", "--print_epoch", default=100, type=int)
+    args.add_argument("-prt_epo", "--print_epoch", default=50, type=int)
     args.add_argument("-eval_epo", "--eval_epoch", default=1499, type=int)
     args.add_argument("-beval_epo", "--base_eval_epoch", default=5449, type=int)
     # args.add_argument("-eval_epo", "--eval_epoch", default=1000, type=int)
