@@ -47,7 +47,6 @@ class SubnetLinear(nn.Linear):
     def forward(self, x, weight_mask=None, bias_mask=None, mode="train"):
         w_pruned, b_pruned = None, None
         # If training, Get the subnet by sorting the scores
-        assert mode == "train"  # TODO: remove latter
         if mode == "train":
             self.weight_mask = GetSubnetFaster.apply(self.w_m.abs(),
                                                      self.zeros_weight,
@@ -60,6 +59,13 @@ class SubnetLinear(nn.Linear):
                                                        self.zeros_bias,
                                                        self.ones_bias,
                                                        self.sparsity)
+                b_pruned = self.bias_mask * self.bias
+        # If inference/valid, use the last compute masks/subnetworks
+
+        elif mode == "val":
+            w_pruned = self.weight_mask * self.weight
+            b_pruned = None
+            if self.bias is not None:
                 b_pruned = self.bias_mask * self.bias
 
         return F.linear(input=x, weight=w_pruned, bias=b_pruned)

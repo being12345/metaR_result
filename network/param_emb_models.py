@@ -39,7 +39,7 @@ class PERelationMetaLearner(nn.Module):
         nn.init.xavier_normal_(self.fc2.weight)
         nn.init.xavier_normal_(self.rel_fc3.fc.weight)
 
-    def forward(self, inputs, mask, mode="train"):
+    def forward(self, inputs, mask, mode):
         if mask is None:
             mask = self.none_masks
 
@@ -75,9 +75,9 @@ class EmbeddingLearner(nn.Module):
         return p_score, n_score
 
 
-class MetaR(nn.Module):
+class PEMetaR(nn.Module):
     def __init__(self, dataset, parameter):
-        super(MetaR, self).__init__()
+        super(PEMetaR, self).__init__()
         self.device = parameter['device']
         self.beta = parameter['beta']
         self.dropout_p = parameter['dropout_p']
@@ -105,7 +105,7 @@ class MetaR(nn.Module):
                                 negative[:, :, 1, :]], 1).unsqueeze(2)
         return pos_neg_e1, pos_neg_e2
 
-    def forward(self, task, iseval=False, curr_rel=''):
+    def forward(self, task, mode, iseval=False, curr_rel=''):
         # transfer task string into embedding
         support, support_negative, query, negative = [self.embedding(t) for t in task]
 
@@ -114,7 +114,8 @@ class MetaR(nn.Module):
         num_q = query.shape[1]  # num of query
         num_n = negative.shape[1]  # num of query negative
 
-        rel = self.relation_learner(support, None)  # FC
+        rel = self.relation_learner(support, None, mode)  # FC
+
         rel.retain_grad()
 
         # relation for support
@@ -123,7 +124,7 @@ class MetaR(nn.Module):
         # because in test and dev step, same relation uses same support,
         # so it's no need to repeat the step of relation-meta learning
         if iseval and curr_rel != '' and curr_rel in self.rel_q_sharing.keys():
-            rel_q = self.rel_q_sharing[curr_rel]
+            rel_q = self.rel_q_sharing[curr_rel]  # TODO: problem!
         else:
             if not self.abla:
                 # split on e1/e2 and concat on pos/neg
@@ -137,7 +138,6 @@ class MetaR(nn.Module):
                 self.zero_grad()
                 loss = self.loss_func(p_score, n_score, y)
                 loss.backward(retain_graph=True)
-
                 grad_meta = rel.grad
                 rel_q = rel - self.beta * grad_meta
             else:

@@ -39,7 +39,7 @@ class Trainer:
         self.checkpoint_epoch = parameter['checkpoint_epoch']
         # device
         self.device = parameter['device']
-        self.metaR = MetaR(dataset, parameter)
+        self.metaR = PEMetaR(dataset, parameter)
         self.metaR.to(self.device)
         # optimizer
         self.optimizer = torch.optim.Adam(self.metaR.parameters(), self.learning_rate)
@@ -152,7 +152,7 @@ class Trainer:
         loss, p_score, n_score = 0, 0, 0
         if not iseval:
             self.optimizer.zero_grad()
-            p_score, n_score = self.metaR(task, iseval, curr_rel)
+            p_score, n_score = self.metaR(task, 'train', iseval, curr_rel)
             y = torch.ones(p_score.shape[0], 1).to(self.device)
             # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
@@ -168,7 +168,7 @@ class Trainer:
                             getattr(getattr(self.metaR.relation_learner, module_name), module_attr).grad[consolidated_masks[key] == 1.0] = 0
             self.optimizer.step()
         elif curr_rel != '':
-            p_score, n_score = self.metaR(task, iseval, curr_rel)
+            p_score, n_score = self.metaR(task, 'val', iseval, curr_rel)
             y = torch.ones(p_score.shape[0], 1).to(self.device)
             # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
@@ -210,7 +210,7 @@ class Trainer:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
                     valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, val_mat, task, e)
-                if task != 0 and e == self.epoch - 1 and task == -1:   # TODO: remove latter
+                if task != 0 and e == self.epoch - 1:   # TODO: remove latter
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
 
                     valid_data = self.novel_continual_eval(previous_relation, task,
@@ -348,7 +348,7 @@ class Trainer:
         return data
 
     def get_epoch_score(self, curr_rel, data, eval_task, ranks, t, temp):
-        _, p_score, n_score = self.do_one_step(eval_task, iseval=True, curr_rel=curr_rel)
+        _, p_score, n_score = self.do_one_step(eval_task, None, iseval=True, curr_rel=curr_rel)
         x = torch.cat([n_score, p_score], 1).squeeze()
         self.rank_predict(data, x, ranks)
 
