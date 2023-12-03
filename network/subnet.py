@@ -79,16 +79,14 @@ class SubnetLinear(nn.Linear):
             nn.init.uniform_(self.b_m, -bound, bound)
 
 
-class EntityMask(SubnetLinear):
-    def __init__(self, in_features, out_features):
-        super(EntityMask, self).__init__(in_features=in_features, out_features=out_features)
+class EntityMask(nn.Module):
+    def __init__(self, relation, few, in_features, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.w_m = nn.Parameter(torch.empty(relation, few, in_features))
+        self.init_mask_parameters()
 
     def forward(self, x, weight_mask=None, bias_mask=None, mode="train"):
-        # If training, Get the subnet by sorting the scores
-        self.weight_mask = F.sigmoid(self.w_m)
-        return F.linear(input=x, weight=self.weight_mask)
+        return F.sigmoid(self.w_m) * x
 
-
-if __name__ == '__main__':
-    model = EntityMask(2, 5)
-    print(model.w_m)
+    def init_mask_parameters(self):
+        nn.init.kaiming_uniform_(self.w_m, a=math.sqrt(5))

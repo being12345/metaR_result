@@ -1,13 +1,15 @@
 from embedding import *
 from collections import OrderedDict
 import torch
-from network.subnet import SubnetLinear
+from network.subnet import SubnetLinear, EntityMask
 
 
 class PERelationMetaLearner(nn.Module):
     def __init__(self, few, embed_size=100, num_hidden1=500, num_hidden2=200, out_size=100, dropout_p=0.5,
-                 sparsity=0.5):
+                 sparsity=0.5, base_relation=30, novel_relation=3):  # TODO: update relation_num
         super(PERelationMetaLearner, self).__init__()
+        self.base_mask = EntityMask(base_relation, few, 2 * embed_size)
+        self.novel_mask = EntityMask(base_relation, few, 2 * embed_size)
         self.embed_size = embed_size
         self.few = few
         self.out_size = out_size
@@ -39,12 +41,16 @@ class PERelationMetaLearner(nn.Module):
         nn.init.xavier_normal_(self.fc2.weight)
         nn.init.xavier_normal_(self.rel_fc3.fc.weight)
 
-    def forward(self, inputs, mask, mode):
+    def forward(self, inputs, mask, mode, epoch, is_base):
         if mask is None:
             mask = self.none_masks
+        if epoch == 0 and not is_base:
+            self.novel_mask.init_mask_parameters()
 
         size = inputs.shape
         x = inputs.contiguous().view(size[0], size[1], -1)
+        if mode == "train":
+            x = self.base_mask(x) if is_base else self.novel_mask(x)
         x = self.fc1(x, weight_mask=mask['fc1.weight'], bias_mask=mask['fc1.bias'], mode=mode)
         x = self.rel_fc1(x)
         x = self.fc2(x, weight_mask=mask['fc2.weight'], bias_mask=mask['fc1.bias'], mode=mode)
@@ -54,7 +60,7 @@ class PERelationMetaLearner(nn.Module):
 
         return x.view(size[0], 1, 1, self.out_size)
 
-    def get_masks(self, task_id):
+    def get_masks(self):
         task_mask = {}
         for name, module in self.named_modules():
             if isinstance(module, SubnetLinear):
@@ -105,7 +111,7 @@ class PEMetaR(nn.Module):
                                 negative[:, :, 1, :]], 1).unsqueeze(2)
         return pos_neg_e1, pos_neg_e2
 
-    def forward(self, task, mode, iseval=False, curr_rel=''):
+    def forward(self, task, mode, epoch, is_base, iseval=False, curr_rel=''):
         # transfer task string into embedding
         support, support_negative, query, negative = [self.embedding(t) for t in task]
 
@@ -114,7 +120,7 @@ class PEMetaR(nn.Module):
         num_q = query.shape[1]  # num of query
         num_n = negative.shape[1]  # num of query negative
 
-        rel = self.relation_learner(support, None, mode)  # FC
+        rel = self.relation_learner(support, None, mode, epoch, is_base)  # FC
         rel.retain_grad()
 
         # relation for support
