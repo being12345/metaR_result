@@ -191,7 +191,6 @@ class Trainer:
         num_tasks = 8  # TODO: update it in parser
 
         per_task_masks, consolidated_masks = {}, {}
-        val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
         MRR_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
         Hit1_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
         Hit5_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
@@ -256,7 +255,7 @@ class Trainer:
             previous_relation = curr_rel  # cache previous relations
 
             # Consolidate task masks to keep track of parameters to-update or not
-            per_task_masks[task] = self.metaR.relation_learner.get_masks(task)
+            per_task_masks[task] = self.metaR.relation_learner.get_masks()
             if task == 0:
                 consolidated_masks = deepcopy(per_task_masks[task])
             else:
