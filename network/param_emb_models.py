@@ -9,7 +9,7 @@ class PERelationMetaLearner(nn.Module):
                  sparsity=0.5, base_relation=30, novel_relation=3):  # TODO: update relation_num
         super(PERelationMetaLearner, self).__init__()
         self.base_mask = EntityMask(base_relation, few, 2 * embed_size)
-        self.novel_mask = EntityMask(base_relation, few, 2 * embed_size)
+        self.novel_mask = EntityMask(novel_relation, few, 2 * embed_size)
         self.embed_size = embed_size
         self.few = few
         self.out_size = out_size
