@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import torch.nn.functional as F
 import numpy as np
 
 from network.param_emb_models import *
@@ -177,7 +178,7 @@ class Trainer:
                                 consolidated_masks[key] == 1.0] = 0
             self.optimizer.step()
         elif curr_rel != '':
-            p_score, n_score = self.metaR(task, 'val', iseval, curr_rel)    # TODO: update iseval and mode
+            p_score, n_score = self.metaR(task, 'val', iseval, curr_rel)  # TODO: update iseval and mode
             y = torch.ones(p_score.shape[0], 1).to(self.device)
             # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
@@ -189,6 +190,7 @@ class Trainer:
         best_value = 0
         bad_counts = 0
         num_tasks = 8  # TODO: update it in parser
+        base_task = None
 
         per_task_masks, consolidated_masks = {}, {}
         MRR_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
@@ -206,6 +208,11 @@ class Trainer:
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
+                # replay base class
+                if not is_base:  # 1. get base_mask find relation 2. add this relation
+                    # train_task =
+                    base_mask = F.sigmoid(self.metaR.relation_learner.base_mask.w_m)
+                    mask = base_mask.sum(axis=-1).sum(axis=-1).max() == base_mask.sum(axis=-1).sum(axis=-1)
                 # Test train_task num
                 loss, _, _ = self.do_one_step(train_task, consolidated_masks, epoch, is_base, iseval=False,
                                               curr_rel=curr_rel)
@@ -253,6 +260,7 @@ class Trainer:
                     #     break
 
             previous_relation = curr_rel  # cache previous relations
+            base_task = train_task if is_base else base_task
 
             # Consolidate task masks to keep track of parameters to-update or not
             per_task_masks[task] = self.metaR.relation_learner.get_masks()
