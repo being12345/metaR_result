@@ -49,8 +49,8 @@ class PERelationMetaLearner(nn.Module):
 
         size = inputs.shape
         x = inputs.contiguous().view(size[0], size[1], -1)
-        if mode == "train":
-            x = self.base_mask(x) if is_base else self.novel_mask(x)
+        if mode == "train" and is_base:
+            x = self.base_mask(x)
         x = self.fc1(x, weight_mask=mask['fc1.weight'], bias_mask=mask['fc1.bias'], mode=mode)
         x = self.rel_fc1(x)
         x = self.fc2(x, weight_mask=mask['fc2.weight'], bias_mask=mask['fc1.bias'], mode=mode)
