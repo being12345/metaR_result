@@ -115,5 +115,8 @@ venv.bak/
 # NELL
 NELL
 
+# __macosx
+__MACOSX
+
 
 
