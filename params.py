@@ -18,6 +18,7 @@ def get_params():
 
     args.add_argument("-dim", "--embed_dim", default=100, type=int)
     args.add_argument("-bs", "--batch_size", default=3, type=int)
+    args.add_argument("-nt", "--num_tasks", default=8, type=int)
     args.add_argument("-lr", "--learning_rate", default=0.001, type=float)
     args.add_argument("-es_p", "--early_stopping_patience", default=30, type=int)
 

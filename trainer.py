@@ -28,6 +28,7 @@ class Trainer:
         self.few = parameter['few']
         self.num_query = parameter['num_query']
         self.batch_size = parameter['batch_size']
+        self.num_tasks = parameter['num_tasks']
         self.learning_rate = parameter['learning_rate']
         self.early_stopping_patience = parameter['early_stopping_patience']
         # epoch
@@ -176,14 +177,14 @@ class Trainer:
         best_epoch = 0
         best_value = 0
         bad_counts = 0
-        num_tasks = 8  # TODO: update it in parser
-        MRR_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
-        Hit1_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
-        Hit5_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
-        Hit10_val_mat = np.zeros((num_tasks, num_tasks))  # record fw and cl vl MRR metrics
+
+        MRR_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        Hit1_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        Hit5_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        Hit10_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
         val_mat = [MRR_val_mat, Hit10_val_mat, Hit5_val_mat, Hit1_val_mat]
 
-        for task in range(num_tasks):
+        for task in range(self.num_tasks):
             # training by epoch
             epoch = self.base_epoch if task == 0 else self.epoch
             eval_epoch = self.base_eval_epoch if task == 0 else self.eval_epoch

@@ -1,2 +1,2 @@
-epoch: [2000]
-eval_epoch: [999]
++ verify relation num
+python main.py --base_classes_relation 42 --num_tasks 3
