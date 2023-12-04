@@ -112,3 +112,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# NELL
+NELL
+
+
+
