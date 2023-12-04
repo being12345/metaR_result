@@ -173,3 +173,4 @@ class DataLoader(object):
         negative_triples = [negative_triples]
 
         return [support_triples, support_negative_triples, query_triple, negative_triples], curr_rel
+

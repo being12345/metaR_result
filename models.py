@@ -125,3 +125,4 @@ class MetaR(nn.Module):
         p_score, n_score = self.embedding_learner(que_neg_e1, que_neg_e2, rel_q, num_q)
 
         return p_score, n_score
+
