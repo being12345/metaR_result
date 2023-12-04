@@ -208,11 +208,14 @@ class Trainer:
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
-                # replay base class
-                if not is_base:  # 1. get base_mask find relation 2. add this relation
-                    # train_task =
+                # replay important base relation
+                if not is_base:
                     base_mask = F.sigmoid(self.metaR.relation_learner.base_mask.w_m)
                     mask = base_mask.sum(axis=-1).sum(axis=-1).max() == base_mask.sum(axis=-1).sum(axis=-1)
+                    idx = (mask > 0).nonzero(as_tuple=True)[0]
+                    for i in idx:
+                        for j, cur in enumerate(train_task):
+                            train_task[j] = train_task[j] + (base_task[j][i.item()],)
                 # Test train_task num
                 loss, _, _ = self.do_one_step(train_task, consolidated_masks, epoch, is_base, iseval=False,
                                               curr_rel=curr_rel)
