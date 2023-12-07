@@ -203,40 +203,24 @@ class Trainer:
                     loss_num = loss.item()
                     self.write_training_log({'Loss': loss_num}, task, e)
                     print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
-                # # save checkpoint on specific epoch
-                # if e % self.checkpoint_epoch == 0 and e != 0:
-                #     print('Epoch  {} has finished, saving...'.format(e))
-                #     self.save_checkpoint(e)
+
+                # save checkpoint on specific epoch
+                if e % self.checkpoint_epoch == 0 and e != 0:
+                    print('Epoch  {} has finished, saving...'.format(e))
+                    self.save_checkpoint(e)
 
                 # do evaluation on specific epoch
                 if e % eval_epoch == 0 and e != 0:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
                     valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, val_mat, task, e)
+
                 if task != 0 and e == self.epoch - 1:
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
 
                     valid_data = self.novel_continual_eval(previous_relation, task,
                                                            istest=False)  # continual learning val only in last epoch
                     self.write_cl_validating_log(valid_data, val_mat, task)
-
-                    # metric = self.parameter['metric']
-                    # # early stopping checking
-                    # if valid_data[metric] > best_value:
-                    #     best_value = valid_data[metric]
-                    #     best_epoch = e
-                    #     print('\tBest model | {0} of valid set is {1:.3f}'.format(metric, best_value))
-                    #     bad_counts = 0
-                    #     # save current best
-                    #     self.save_checkpoint(best_epoch)
-                    # else:
-                    #     print('\tBest {0} of valid set is {1:.3f} at {2} | bad count is {3}'.format(
-                    #         metric, best_value, best_epoch, bad_counts))
-                    #     bad_counts += 1
-                    #
-                    # if bad_counts >= self.early_stopping_patience:
-                    #     print('\tEarly stopping at epoch %d' % e)
-                    #     break
 
             previous_relation = curr_rel  # cache previous relations
 
@@ -245,8 +229,6 @@ class Trainer:
         np.savetxt(os.path.join(self.csv_dir, 'Hit@5.csv'), Hit5_val_mat, delimiter=",")
         np.savetxt(os.path.join(self.csv_dir, 'Hit@1.csv'), Hit1_val_mat, delimiter=",")
         print('Training has finished')
-        # print('\tBest epoch is {0} | {1} of valid set is {2:.3f}'.format(best_epoch, metric, best_value))
-        # self.save_best_state_dict(best_epoch)
         print('Finish')
 
     def novel_continual_eval(self, previous_rel, task, istest=False):
