@@ -1,2 +1,14 @@
-+ verify relation num
-python main.py --base_classes_relation 42 --num_tasks 3
++ 测试
+python main.py
+
++ baseline
+python main.py -bepo 12000 -epo 500 -prt_epo 100 -beval_epo 11999  -eval_epo 499
+
++ 输入参数 嵌入
+python main.py -bepo 12000 -epo 500 -prt_epo 100 -beval_epo 11999  -eval_epo 499
+
++ 输入参数 嵌入 novel more relation (记得修改 num_task)
+python main.py -bepo 12000 -epo 500 -prt_epo 100 -beval_epo 11999  -eval_epo 499 --batch_size 7
+
++ 增加 few shot 能力
+python main.py -bepo 20000 -epo 500 -br 51 -prt_epo 100 -beval_epo 19999  -eval_epo 499 --batch_size 7

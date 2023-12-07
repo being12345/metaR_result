@@ -1,19 +1,15 @@
+from copy import deepcopy
+
+import torch.nn.functional as F
 import numpy as np
 
-from models import *
+from network.param_emb_models import *
 from tensorboardX import SummaryWriter
 import os
 import sys
 import torch
 import shutil
 import logging
-
-
-def test_task(train_task):
-    support, support_negative, query, negative = train_task
-    print(
-        f'relation_num: {len(support)} support_num: {len(support[0])} support_neg_num: {len(support_negative[0])} '
-        f'query_num: {len(query[0])} query_neg_num: {len(negative[0])}')
 
 
 class Trainer:
@@ -40,7 +36,7 @@ class Trainer:
         self.checkpoint_epoch = parameter['checkpoint_epoch']
         # device
         self.device = parameter['device']
-        self.metaR = MetaR(dataset, parameter)
+        self.metaR = PEMetaR(dataset, parameter)
         self.metaR.to(self.device)
         # optimizer
         self.optimizer = torch.optim.Adam(self.metaR.parameters(), self.learning_rate)
@@ -65,33 +61,8 @@ class Trainer:
         if parameter['step'] in ['test', 'dev']:
             self.reload()
 
-    def reload(self):
-        if self.parameter['eval_ckpt'] is not None:
-            state_dict_file = os.path.join(self.ckpt_dir, 'state_dict_' + self.parameter['eval_ckpt'] + '.ckpt')
-        else:
-            state_dict_file = os.path.join(self.state_dir, 'state_dict')
-        self.state_dict_file = state_dict_file
-        logging.info('Reload state_dict from {}'.format(state_dict_file))
-        print('reload state_dict from {}'.format(state_dict_file))
-        state = torch.load(state_dict_file, map_location=self.device)
-        if os.path.isfile(state_dict_file):
-            self.metaR.load_state_dict(state)
-        else:
-            raise RuntimeError('No state dict in {}!'.format(state_dict_file))
-
     def save_checkpoint(self, epoch):
         torch.save(self.metaR.state_dict(), os.path.join(self.ckpt_dir, 'state_dict_' + str(epoch) + '.ckpt'))
-
-    def del_checkpoint(self, epoch):
-        path = os.path.join(self.ckpt_dir, 'state_dict_' + str(epoch) + '.ckpt')
-        if os.path.exists(path):
-            os.remove(path)
-        else:
-            raise RuntimeError('No such checkpoint to delete: {}'.format(path))
-
-    def save_best_state_dict(self, best_epoch):
-        shutil.copy(os.path.join(self.ckpt_dir, 'state_dict_' + str(best_epoch) + '.ckpt'),
-                    os.path.join(self.state_dir, 'state_dict'))
 
     def write_training_log(self, data, task, epoch):
         self.writer.add_scalar(f'Training_Loss_{task}', data['Loss'], epoch)
@@ -139,6 +110,26 @@ class Trainer:
         logging.info("MRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
+    def get_total_mrr(self, arr):
+        idx = [i for i in range(arr.shape[0])]
+        idx = [idx, idx]
+        fw_metric = arr[idx]
+        arr[idx] = 0
+        cl_metric = arr.sum(axis=1)
+        for i, j in enumerate(cl_metric):
+            if i != 0:
+                cl_metric[i] = j / i
+
+        return np.array([fw_metric, cl_metric]).T
+
+    def save_metrics(self, Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat):
+        np.savetxt(os.path.join(self.csv_dir, 'MRR.csv'), MRR_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@10.csv'), Hit10_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@5.csv'), Hit5_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@1.csv'), Hit1_val_mat, delimiter=",")
+        mrr = self.get_total_mrr(MRR_val_mat)
+        np.savetxt(os.path.join(self.csv_dir, 'metric.csv'), mrr, delimiter=",")
+
     def rank_predict(self, data, x, ranks):
         # query_idx is the idx of positive score
         query_idx = x.shape[0] - 1
@@ -155,18 +146,28 @@ class Trainer:
             data['Hits@1'] += 1
         data['MRR'] += 1.0 / rank
 
-    def do_one_step(self, task, iseval=False, curr_rel=''):
+    def do_one_step(self, task, consolidated_masks, epoch=None, is_base=None, iseval=False, curr_rel=''):
         loss, p_score, n_score = 0, 0, 0
         if not iseval:
             self.optimizer.zero_grad()
-            p_score, n_score = self.metaR(task, iseval, curr_rel)
+            p_score, n_score = self.metaR(task, 'train', epoch, is_base, iseval, curr_rel)
             y = torch.ones(p_score.shape[0], 1).to(self.device)
             # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
             loss.backward()
+
+            # Continual Subnet no backprop
+            if consolidated_masks is not None and consolidated_masks != {}:  # Only do this for tasks 1 and beyond
+                for key in consolidated_masks.keys():
+                    module_name, module_attr = key.split('.')  # e.g. fc1.weight
+                    # Zero-out gradients
+                    if hasattr(getattr(self.metaR.relation_learner, module_name), module_attr):
+                        if getattr(getattr(self.metaR.relation_learner, module_name), module_attr) is not None:
+                            getattr(getattr(self.metaR.relation_learner, module_name), module_attr).grad[
+                                consolidated_masks[key] == 1.0] = 0
             self.optimizer.step()
         elif curr_rel != '':
-            p_score, n_score = self.metaR(task, iseval, curr_rel)
+            p_score, n_score = self.metaR(task, 'val', iseval, curr_rel)  # TODO: update iseval and mode
             y = torch.ones(p_score.shape[0], 1).to(self.device)
             # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
@@ -174,9 +175,7 @@ class Trainer:
 
     def train(self):
         # initialization
-        best_epoch = 0
-        best_value = 0
-        bad_counts = 0
+        per_task_masks, consolidated_masks = {}, {}
 
         MRR_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
         Hit1_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
@@ -193,8 +192,17 @@ class Trainer:
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
+                # replay important base relation
+                if not is_base:
+                    base_mask = F.sigmoid(self.metaR.relation_learner.base_mask.w_m)
+                    mask = base_mask.sum(axis=-1).sum(axis=-1).max() == base_mask.sum(axis=-1).sum(axis=-1)
+                    idx = (mask > 0).nonzero(as_tuple=True)[0]
+                    for i in idx:
+                        for j, cur in enumerate(train_task):
+                            train_task[j] = train_task[j] + (base_task[j][i.item()],)
                 # Test train_task num
-                loss, _, _ = self.do_one_step(train_task, iseval=False, curr_rel=curr_rel)
+                loss, _, _ = self.do_one_step(train_task, consolidated_masks, epoch, is_base, iseval=False,
+                                              curr_rel=curr_rel)
                 # if e == 0:  # TODO: test module move later
                 #     test_task(train_task)
 
@@ -223,11 +231,20 @@ class Trainer:
                     self.write_cl_validating_log(valid_data, val_mat, task)
 
             previous_relation = curr_rel  # cache previous relations
+            base_task = train_task if is_base else base_task
 
-        np.savetxt(os.path.join(self.csv_dir, 'MRR.csv'), MRR_val_mat, delimiter=",")
-        np.savetxt(os.path.join(self.csv_dir, 'Hit@10.csv'), Hit10_val_mat, delimiter=",")
-        np.savetxt(os.path.join(self.csv_dir, 'Hit@5.csv'), Hit5_val_mat, delimiter=",")
-        np.savetxt(os.path.join(self.csv_dir, 'Hit@1.csv'), Hit1_val_mat, delimiter=",")
+            # Consolidate task masks to keep track of parameters to-update or not
+            per_task_masks[task] = self.metaR.relation_learner.get_masks()
+            if task == 0:
+                consolidated_masks = deepcopy(per_task_masks[task])
+            else:
+                for key in per_task_masks[task].keys():
+                    # Operation on sparsity
+                    if consolidated_masks[key] is not None and per_task_masks[task][key] is not None:
+                        consolidated_masks[key] = 1 - ((1 - consolidated_masks[key]) * (1 - per_task_masks[task][key]))
+
+        self.save_metrics(Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat)
+
         print('Training has finished')
         print('Finish')
 
@@ -326,7 +343,7 @@ class Trainer:
         return data
 
     def get_epoch_score(self, curr_rel, data, eval_task, ranks, t, temp):
-        _, p_score, n_score = self.do_one_step(eval_task, iseval=True, curr_rel=curr_rel)
+        _, p_score, n_score = self.do_one_step(eval_task, None, iseval=True, curr_rel=curr_rel)
         x = torch.cat([n_score, p_score], 1).squeeze()
         self.rank_predict(data, x, ranks)
 
@@ -336,57 +353,3 @@ class Trainer:
         sys.stdout.write("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
         sys.stdout.flush()
-
-    def eval_by_relation(self, istest=False, epoch=None):
-        self.metaR.eval()
-        self.metaR.rel_q_sharing = dict()
-
-        if istest:
-            data_loader = self.test_data_loader
-        else:
-            data_loader = self.dev_data_loader
-        data_loader.curr_tri_idx = 0
-
-        all_data = {'MRR': 0, 'Hits@1': 0, 'Hits@5': 0, 'Hits@10': 0}
-        all_t = 0
-        all_ranks = []
-
-        for rel in data_loader.all_rels:
-            print("rel: {}, num_cands: {}, num_tasks:{}".format(
-                rel, len(data_loader.rel2candidates[rel]), len(data_loader.tasks[rel][self.few:])))
-            data = {'MRR': 0, 'Hits@1': 0, 'Hits@5': 0, 'Hits@10': 0}
-            temp = dict()
-            t = 0
-            ranks = []
-            while True:
-                eval_task, curr_rel = data_loader.next_one_on_eval_by_relation(rel)
-                if eval_task == 'EOT':
-                    break
-                t += 1
-
-                _, p_score, n_score = self.do_one_step(eval_task, iseval=True, curr_rel=rel)
-                x = torch.cat([n_score, p_score], 1).squeeze()
-
-                self.rank_predict(data, x, ranks)
-
-                for k in data.keys():
-                    temp[k] = data[k] / t
-                sys.stdout.write("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                    t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
-                sys.stdout.flush()
-
-            print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-                t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
-
-            for k in data.keys():
-                all_data[k] += data[k]
-            all_t += t
-            all_ranks.extend(ranks)
-
-        print('Overall')
-        for k in all_data.keys():
-            all_data[k] = round(all_data[k] / all_t, 3)
-        print("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
-            all_t, all_data['MRR'], all_data['Hits@10'], all_data['Hits@5'], all_data['Hits@1']))
-
-        return all_data

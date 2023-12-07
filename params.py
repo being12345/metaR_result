@@ -21,7 +21,6 @@ def get_params():
     args.add_argument("-nt", "--num_tasks", default=8, type=int)
     args.add_argument("-lr", "--learning_rate", default=0.001, type=float)
     args.add_argument("-es_p", "--early_stopping_patience", default=30, type=int)
-
     # args.add_argument("-epo", "--epoch", default=100000, type=int)
     args.add_argument("-epo", "--epoch", default=1500, type=int)
     args.add_argument("-bepo", "--base_epoch", default=5500, type=int)
