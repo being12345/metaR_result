@@ -1,5 +1,0 @@
-## test
-python main.py --dataset NELL-One --data_path ./NELL --few 10 --num_query 30 --data_form Pre-Train --prefix nellone_1shot_pretrain --device 0 -bs 30 --epoch 3
-
-## standard
-python main.py --dataset NELL-One --data_path ./NELL --few 1 --data_form Pre-Train --prefix nellone_1shot_pretrain --device 0 --epoch 3
