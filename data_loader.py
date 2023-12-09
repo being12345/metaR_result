@@ -29,11 +29,7 @@ class DataLoader(object):
             self.eval_triples = []
             self.tasks_relations_num = []
 
-    def next_one(self, is_last, is_base):
-        # shift curr_rel_idx to 0 after one circle of all relations
-        # if self.curr_rel_idx % self.num_rels == 0:    # TODO: It's no need in continual learning
-        #     random.shuffle(self.all_rels)
-        #     self.curr_rel_idx = 0
+    def next_one(self, is_base):
         few = self.bfew if is_base is True else self.few
         nq = self.bnq if is_base is True else self.nq
 
@@ -74,16 +70,16 @@ class DataLoader(object):
             negative_triples.append([e1, rel, negative])
 
         # shift current relation idx to next
-        self.curr_rel_idx = (self.curr_rel_idx + 1) % self.num_rels
+        self.curr_rel_idx = self.curr_rel_idx + 1
 
-        return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel  # TODO: relation not just one
+        return support_triples, support_negative_triples, query_triples, negative_triples, curr_rel
 
     def next_batch(self, is_last, is_base):
         relation = self.br if is_base is True else self.bs
         last_rel_idx = self.curr_rel_idx
-        next_batch_all = [self.next_one(is_last, is_base) for _ in range(relation)]
-        self.curr_rel_idx = self.curr_rel_idx if is_last is True else last_rel_idx
+        next_batch_all = [self.next_one(is_base) for _ in range(relation)]
 
+        self.curr_rel_idx = self.curr_rel_idx if is_last is True else last_rel_idx
         support, support_negative, query, negative, curr_rel = zip(*next_batch_all)
         return [support, support_negative, query, negative], curr_rel
 
@@ -173,4 +169,3 @@ class DataLoader(object):
         negative_triples = [negative_triples]
 
         return [support_triples, support_negative_triples, query_triple, negative_triples], curr_rel
-
