@@ -169,7 +169,6 @@ class Trainer:
     def train(self):
         # initialization
         Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat, val_mat = self.init_val_mat()
-        self.save_val_mat(Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat)
 
         for task in range(self.num_tasks):
             # training by epoch
