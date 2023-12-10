@@ -21,6 +21,9 @@ class Trainer:
         self.test_data_loader = data_loaders[2]
         self.fw_dev_data_loader = data_loaders[3]
         # parameters
+        self.bfew = parameter['base_classes_few']
+        self.bnq = parameter['base_classes_num_query']
+        self.br = parameter['base_classes_relation']
         self.few = parameter['few']
         self.num_query = parameter['num_query']
         self.batch_size = parameter['batch_size']
@@ -102,10 +105,8 @@ class Trainer:
             logging.info("Task: {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
                 str(i), data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
 
-    def logging_eval_data(self, data, state_path, istest=False):
-        setname = 'dev set'
-        if istest:
-            setname = 'test set'
+    def logging_eval_data(self, data, state_path):
+        setname = 'val set'
         logging.info("Eval {} on {}".format(state_path, setname))
         logging.info("MRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
@@ -175,20 +176,15 @@ class Trainer:
 
     def train(self):
         # initialization
+        Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat, val_mat = self.init_val_mat()
         per_task_masks, consolidated_masks = {}, {}
-
-        MRR_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
-        Hit1_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
-        Hit5_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
-        Hit10_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
-        val_mat = [MRR_val_mat, Hit10_val_mat, Hit5_val_mat, Hit1_val_mat]
 
         for task in range(self.num_tasks):
             # training by epoch
             epoch = self.base_epoch if task == 0 else self.epoch
             eval_epoch = self.base_eval_epoch if task == 0 else self.eval_epoch
             for e in range(epoch):
-                is_last = False if e != self.epoch - 1 else True
+                is_last = False if e != epoch - 1 else True
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
@@ -200,11 +196,10 @@ class Trainer:
                     for i in idx:
                         for j, cur in enumerate(train_task):
                             train_task[j] = train_task[j] + (base_task[j][i.item()],)
-                # Test train_task num
+
+                self.test_train_relation_support_query(is_base, train_task, e)  # TODO: test
                 loss, _, _ = self.do_one_step(train_task, consolidated_masks, epoch, is_base, iseval=False,
                                               curr_rel=curr_rel)
-                # if e == 0:  # TODO: test module move later
-                #     test_task(train_task)
 
                 # print the loss on specific epoch
                 if e % self.print_epoch == 0:
@@ -220,14 +215,12 @@ class Trainer:
                 # do evaluation on specific epoch
                 if e % eval_epoch == 0 and e != 0:
                     print('Epoch  {} has finished, validating few shot...'.format(e))
-                    valid_data = self.fw_eval(task, istest=False, epoch=e)  # few shot val
+                    valid_data = self.fw_eval(task, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, val_mat, task, e)
 
                 if task != 0 and e == self.epoch - 1:
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
-
-                    valid_data = self.novel_continual_eval(previous_relation, task,
-                                                           istest=False)  # continual learning val only in last epoch
+                    valid_data = self.novel_continual_eval(previous_relation, task)
                     self.write_cl_validating_log(valid_data, val_mat, task)
 
             previous_relation = curr_rel  # cache previous relations
@@ -245,16 +238,56 @@ class Trainer:
 
         self.save_metrics(Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat)
 
+        self.save_val_mat(Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat)
         print('Training has finished')
-        print('Finish')
 
-    def novel_continual_eval(self, previous_rel, task, istest=False):
+    def save_val_mat(self, Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat):
+        np.savetxt(os.path.join(self.csv_dir, 'MRR.csv'), MRR_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@10.csv'), Hit10_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@5.csv'), Hit5_val_mat, delimiter=",")
+        np.savetxt(os.path.join(self.csv_dir, 'Hit@1.csv'), Hit1_val_mat, delimiter=",")
+
+        idx = [i for i in range(MRR_val_mat.shape[0])]
+        idx = [idx, idx]
+        fw_metric = MRR_val_mat[tuple(idx)]
+        MRR_val_mat[tuple(idx)] = 0
+        cl_metric = MRR_val_mat.sum(axis=1)
+        for i, j in enumerate(cl_metric):
+            if i != 0:
+                cl_metric[i] = j / i
+        metric = np.array([fw_metric, cl_metric]).T
+        np.savetxt(os.path.join(self.csv_dir, 'metric.csv'), metric, delimiter=",")
+
+    def init_val_mat(self):
+        MRR_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        Hit1_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        Hit5_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        Hit10_val_mat = np.zeros((self.num_tasks, self.num_tasks))  # record fw and cl vl MRR metrics
+        val_mat = [MRR_val_mat, Hit10_val_mat, Hit5_val_mat, Hit1_val_mat]
+        return Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat, val_mat
+
+    def test_train_relation_support_query(self, is_base, train_task, epoch):
+        print(
+            f"Test relation num {len(train_task[0])} few num {len(train_task[0][0])} "
+            f"query num {len(train_task[2][0])}")
+        if is_base:
+            assert len(train_task[0]) == self.br
+            assert len(train_task[0][0]) == self.bfew
+            assert len(train_task[2][0]) == self.bnq
+            assert self.train_data_loader.curr_rel_idx == 0 if epoch != self.base_epoch - 1 else self.br
+        else:
+            assert len(train_task[0]) == self.batch_size
+            assert len(train_task[0][0]) == self.few
+            assert len(train_task[2][0]) == self.num_query
+            assert self.train_data_loader.curr_rel_idx != 0 if epoch != self.epoch - 1 else 51
+            print(self.train_data_loader.curr_rel_idx)
+
+    def novel_continual_eval(self, previous_rel, task):
         self.metaR.eval()
         # clear sharing rel_q
         self.metaR.rel_q_sharing = dict()
 
-        data_loader = self.test_data_loader if istest is True else self.dev_data_loader
-        # if epoch == self.eval_epoch:  # only eval cl in last epoch
+        data_loader = self.dev_data_loader
         current_eval_num = 0
         for rel in previous_rel:
             data_loader.eval_triples.extend(data_loader.tasks[rel][self.few:])
@@ -275,6 +308,7 @@ class Trainer:
         while True:
             # sample all the eval tasks
             eval_task, curr_rel = data_loader.next_one_on_eval()
+
             # at the end of sample tasks, a symbol 'EOT' will return
             if eval_task == 'EOT':
                 break
@@ -305,12 +339,12 @@ class Trainer:
             self.logging_cl_training_data(tasks_data, task)
         return tasks_data
 
-    def fw_eval(self, task, istest=False, epoch=None):
+    def fw_eval(self, task, epoch=None):
         self.metaR.eval()
         # clear sharing rel_q
         self.metaR.rel_q_sharing = dict()
 
-        data_loader = self.test_data_loader if istest is True else self.fw_dev_data_loader
+        data_loader = self.fw_dev_data_loader
         data_loader.curr_tri_idx = 0
 
         # initial return data of validation
@@ -335,7 +369,7 @@ class Trainer:
         if self.parameter['step'] == 'train':
             self.logging_fw_training_data(data, epoch, task)
         else:
-            self.logging_eval_data(data, self.state_dict_file, istest)
+            self.logging_eval_data(data, self.state_dict_file)
 
         print("few shot {}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             t, data['MRR'], data['Hits@10'], data['Hits@5'], data['Hits@1']))
