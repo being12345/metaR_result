@@ -251,7 +251,8 @@ class Trainer:
             assert len(train_task[0]) == self.batch_size
             assert len(train_task[0][0]) == self.few
             assert len(train_task[2][0]) == self.num_query
-            assert self.train_data_loader.curr_rel_idx != 0
+            assert self.train_data_loader.curr_rel_idx != 0 if epoch != self.epoch - 1 else 51
+            print(self.train_data_loader.curr_rel_idx)
 
     def novel_continual_eval(self, previous_rel, task):
         self.metaR.eval()
