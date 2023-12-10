@@ -170,7 +170,6 @@ class Trainer:
         elif curr_rel != '':
             p_score, n_score = self.metaR(task, 'val', iseval, curr_rel)  # TODO: update iseval and mode
             y = torch.ones(p_score.shape[0], 1).to(self.device)
-            # y = torch.Tensor([1]).to(self.device)
             loss = self.metaR.loss_func(p_score, n_score, y)
         return loss, p_score, n_score
 
@@ -188,6 +187,7 @@ class Trainer:
                 is_base = True if task == 0 else False
                 # sample one batch from data_loader
                 train_task, curr_rel = self.train_data_loader.next_batch(is_last, is_base)
+
                 # replay important base relation
                 if not is_base:
                     base_mask = F.sigmoid(self.metaR.relation_learner.base_mask.w_m)
@@ -197,7 +197,6 @@ class Trainer:
                         for j, cur in enumerate(train_task):
                             train_task[j] = train_task[j] + (base_task[j][i.item()],)
 
-                self.test_train_relation_support_query(is_base, train_task, e)  # TODO: test
                 loss, _, _ = self.do_one_step(train_task, consolidated_masks, epoch, is_base, iseval=False,
                                               curr_rel=curr_rel)
 
@@ -218,7 +217,7 @@ class Trainer:
                     valid_data = self.fw_eval(task, epoch=e)  # few shot val
                     self.write_fw_validating_log(valid_data, val_mat, task, e)
 
-                if task != 0 and e == self.epoch - 1:
+                if task != 0 and e == self.epoch - 1 and e == -1:  # TODO: test
                     print('Epoch  {} has finished, validating continual learning...'.format(e))
                     valid_data = self.novel_continual_eval(previous_relation, task)
                     self.write_cl_validating_log(valid_data, val_mat, task)
@@ -268,7 +267,7 @@ class Trainer:
 
     def test_train_relation_support_query(self, is_base, train_task, epoch):
         print(
-            f"Test relation num {len(train_task[0])} few num {len(train_task[0][0])} "
+            f"Assert relation num {len(train_task[0])} few num {len(train_task[0][0])} "
             f"query num {len(train_task[2][0])}")
         if is_base:
             assert len(train_task[0]) == self.br
@@ -276,11 +275,11 @@ class Trainer:
             assert len(train_task[2][0]) == self.bnq
             assert self.train_data_loader.curr_rel_idx == 0 if epoch != self.base_epoch - 1 else self.br
         else:
-            assert len(train_task[0]) == self.batch_size
+            assert len(train_task[0]) == self.batch_size + 1  # replay one node
             assert len(train_task[0][0]) == self.few
             assert len(train_task[2][0]) == self.num_query
             assert self.train_data_loader.curr_rel_idx != 0 if epoch != self.epoch - 1 else 51
-            print(self.train_data_loader.curr_rel_idx)
+            print(f'Test idx {self.train_data_loader.curr_rel_idx}')
 
     def novel_continual_eval(self, previous_rel, task):
         self.metaR.eval()
@@ -387,3 +386,6 @@ class Trainer:
         sys.stdout.write("{}\tMRR: {:.3f}\tHits@10: {:.3f}\tHits@5: {:.3f}\tHits@1: {:.3f}\r".format(
             t, temp['MRR'], temp['Hits@10'], temp['Hits@5'], temp['Hits@1']))
         sys.stdout.flush()
+
+    def test_replay_base(self, train_task):
+        print(f"Test base support replay {train_task[0][-1]}")
