@@ -204,7 +204,7 @@ class Trainer:
                 if e % self.print_epoch == 0:
                     loss_num = loss.item()
                     self.write_training_log({'Loss': loss_num}, task, e)
-                    print("Epoch: {}\tLoss: {:.4f}".format(e, loss_num))
+                    print("Epoch: {}\tLoss: {:.4f} {}".format(e, loss_num, self.train_data_loader.curr_rel_idx))
 
                 # save checkpoint on specific epoch
                 if e % self.checkpoint_epoch == 0 and e != 0:
