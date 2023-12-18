@@ -1,3 +1,4 @@
+import pickle
 from copy import deepcopy
 
 import torch.nn.functional as F
@@ -177,7 +178,10 @@ class Trainer:
         # initialization
         Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat, val_mat = self.init_val_mat()
         per_task_masks, consolidated_masks = {}, {}
-
+        
+        # with open('saved_dictionary.pkl', 'wb') as f:
+        #     pickle.dump(per_task_masks, f)
+            
         for task in range(self.num_tasks):
             # training by epoch
             epoch = self.base_epoch if task == 0 else self.epoch
@@ -233,8 +237,12 @@ class Trainer:
                 for key in per_task_masks[task].keys():
                     # Operation on sparsity
                     if consolidated_masks[key] is not None and per_task_masks[task][key] is not None:
-                        consolidated_masks[key] = 1 - ((1 - consolidated_masks[key]) * (1 - per_task_masks[task][key]))
+                        # consolidated_masks[key] = 1 - ((1 - consolidated_masks[key]) * (1 - per_task_masks[task][key]))
+                        pass
 
+        with open('saved_dictionary.pkl', 'wb') as f:
+            pickle.dump(per_task_masks, f)
+            
         self.save_metrics(Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat)
 
         self.save_val_mat(Hit10_val_mat, Hit1_val_mat, Hit5_val_mat, MRR_val_mat)
